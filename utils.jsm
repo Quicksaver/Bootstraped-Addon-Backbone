@@ -12,7 +12,7 @@ this.moduleAid = {
 			moduleAid.createVars(moduleAid._loadedModules[0].vars);
 			moduleAid._loadedModules[0].loaded = true;
 			
-			// remove every listener, timer and observer placed when closing the window
+			// This is so the observers aren't called twice on quitting sometimes
 			observerAid.add(function() { observerAid.hasQuit = true; }, 'quit-application');
 			
 			// Will remove this later
@@ -25,7 +25,7 @@ this.moduleAid = {
 			moduleAid.clean();
 		},
 		vars: ['hasAncestor', 'hideIt', 'modifyFunction', 'setWatchers', 'listenerAid', 'aSync', 'timerAid', 'prefAid', 'observerAid', 'privateBrowsingAid', 'styleAid', 'moduleAid', 'self'],
-		version: '1.0.5',
+		version: '1.0.6',
 		loaded: false
 	}],
 	_moduleVars: {},
@@ -635,11 +635,30 @@ this.timerAid = {
 this.prefAid = {
 	_prefObjects: {},
 	length: 0,
+	nsIPrefService: Components.classes["@mozilla.org/preferences-service;1"].getService(Components.interfaces.nsIPrefService),
 	
-	init: function(prefList, branch) {
+	setDefaults: function(prefList, branch) {
 		if(!branch) {
 			branch = objPathString;
 		}
+		
+		var defaultBranch = this.nsIPrefService.getDefaultBranch('extensions.'+branch+'.');
+		for(var pref in prefList) {
+			if(typeof(prefList[pref]) == 'string') {
+				defaultBranch.setCharPref(pref, prefList[pref]);
+			} else if(typeof(prefList[pref]) == 'boolean') {
+				defaultBranch.setBoolPref(pref, prefList[pref]);
+			} else if(typeof(prefList[pref]) == 'number') {
+				defaultBranch.setIntPref(pref, prefList[pref]);
+			}
+		}
+	},
+	
+	ready: function(prefList, branch) {
+		if(!branch) {
+			branch = objPathString;
+		}
+		
 		if(typeof(prefList) == 'string') {
 			this._setPref(prefList, branch);
 		} else {
@@ -651,7 +670,7 @@ this.prefAid = {
 	
 	_setPref: function(pref, branch) {
 		if(!this._prefObjects[pref]) {
-			this._prefObjects[pref] = Application.prefs.get('extensions.'+branch+'.' + pref);
+			this._prefObjects[pref] = Application.prefs.get('extensions.'+branch+'.'+pref);
 			this.__defineGetter__(pref, function() { return this._prefObjects[pref].value; });
 			this.__defineSetter__(pref, function(v) { return this._prefObjects[pref].value = v; });
 			this.length++;
