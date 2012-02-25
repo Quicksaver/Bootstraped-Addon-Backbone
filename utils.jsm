@@ -16,19 +16,19 @@ this.moduleAid = {
 			observerAid.clean();
 		},
 		vars: ['hasAncestor', 'hideIt', 'modifyFunction', 'setWatchers', 'listenerAid', 'aSync', 'timerAid', 'prefAid', 'observerAid', 'privateBrowsingAid', 'styleAid', 'moduleAid', 'self'],
-		version: '1.0.2'
+		version: '1.0.3'
 	}],
 	_moduleVars: {},
 	
-	loadIf: function(aPath, anIf) {
+	loadIf: function(aPath, anIf, delayed) {
 		if(anIf) {
-			this.load(aPath);
+			this.load(aPath, delayed);
 		} else {
 			this.unload(aPath);
 		}
 	},
 	
-	load: function(aPath) {
+	load: function(aPath, delayed) {
 		if(this.loaded(aPath)) {
 			return false;
 		}
@@ -47,7 +47,11 @@ this.moduleAid = {
 			this.createVars(VARSLIST);
 		}
 		if(self.LOADMODULE) {
-			LOADMODULE();
+			if(!delayed) {
+				LOADMODULE();
+			} else {
+				aSync(LOADMODULE, 500);
+			}
 		}
 		
 		delete self.VARSLIST;
@@ -530,8 +534,8 @@ this.listenerAid = {
 listenerAid.add(window, "unload", function() { listenerAid.clean(); }, false, true);
 
 // this lets me run functions asyncronously, basically it's a one shot timer with a delay of 0msec
-this.aSync = function(aFunc) {
-	return timerAid.create(aFunc, 0);
+this.aSync = function(aFunc, aDelay) {
+	return timerAid.create(aFunc, (!aDelay) ? 0 : aDelay);
 }
 
 // Object to aid in setting, initializing and cancelling timers
