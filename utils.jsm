@@ -1,9 +1,96 @@
-// File: utils.jsm
-// Version: 1.0.0
-
 // Many times I can't use 'this' to refer to the owning var's context, so I'm setting 'this' as 'self', 
 // I can use 'self' from within functions, timers and listeners easily and to bind those functions to it as well
 var self = this;
+
+// Quick method to load subscripts into the context of "this"
+var moduleAid = {
+	loader: mozIJSSubScriptLoader,
+	_loadedModules: [{ path: "resource://"+objPathString+"/modules/utils.jsm", unload: null, vars: null, version: '1.0.1' }],
+	_moduleVars: {},
+	
+	loadIf: function(aPath, anIf) {
+		if(anIf) {
+			this.load(aPath);
+		} else {
+			this.unload(aPath);
+		}
+	},
+	
+	load: function(aPath) {
+		if(this.loaded(aPath)) {
+			return false;
+		}
+		
+		this.loader.loadSubScript(aPath, self);
+		
+		var module = {
+			path: aPath,
+			unload: (self.UNLOADMODULE) ? UNLOADMODULE : null,
+			vars: (self.VARSLIST) ? VARSLIST : null,
+			version: (self.VERSION) ? VERSION : null
+		};
+		this._loadedModules.push(module);
+		
+		if(self.VARSLIST) {
+			for(var i=0; i<VARSLIST.length; i++) {
+				if(this._moduleVars[VARSLIST[i]]) {
+					this._moduleVars[VARSLIST[i]]++;
+				} else {
+					this._moduleVars[VARSLIST[i]] = 1;
+				}
+			}
+		}
+		if(self.LOADMODULE) {
+			LOADMODULE();
+		}
+		
+		delete self.VARSLIST;
+		delete self.LOADMODULE;
+		delete self.UNLOADMODULE;
+		delete self.VERSION;
+		return true;
+	},
+	
+	unload: function(aPath) {
+		for(var i = 0; i < this._loadedModules.length; i++) {
+			if(this._loadedModules[i].path == aPath) {
+				if(this._loadedModules[i].unload) {
+					this._loadedModules[i].unload();
+				}
+				if(this._loadedModules[i].vars) {
+					for(var o = 0; o < this._loadedModules[i].vars.length; o++) {
+						this.deleteVar(this._loadedModules[i].vars[o]);
+					}
+				}
+				this._loadedModules.splice(i, 1);
+				return true;
+			}
+		}
+		return false;
+	},
+	
+	loaded: function(aPath) {
+		for(var i = 0; i < this._loadedModules.length; i++) {
+			if(this._loadedModules[i].path == aPath) {
+				return true;
+			}
+		}
+		return false;
+	},
+	
+	deleteVar: function(aVar) {
+		if(this._moduleVars[aVar]) {
+			this._moduleVars[aVar]--;
+			if(this._moduleVars[aVar] == 0) {
+				delete self[aVar];
+				delete this._moduleVars[aVar];
+			}
+			return true;
+		}
+		return false;
+	}
+};
+delete self.mozIJSSubScriptLoader; // self removes unnecessary javascript warnings that show up in the console
 
 // Checks if aNode decends from aParent
 var hasAncestor = function(aNode, aParent, aWindow) {
@@ -649,95 +736,6 @@ var privateBrowsingAid = {
 		observerAid.remove(watcher, "quit-application");
 	}
 };
-
-// Quick method to load subscripts into the context of "this"
-var moduleAid = {
-	loader: mozIJSSubScriptLoader,
-	_loadedModules: [{ path: "resource://"+objPathString+"/modules/utils.jsm", unload: null, vars: null }],
-	_moduleVars: {},
-	
-	loadIf: function(aPath, anIf) {
-		if(anIf) {
-			this.load(aPath);
-		} else {
-			this.unload(aPath);
-		}
-	},
-	
-	load: function(aPath) {
-		if(this.loaded(aPath)) {
-			return false;
-		}
-		
-		this.loader.loadSubScript(aPath, self);
-		
-		var module = {
-			path: aPath,
-			unload: (self.UNLOADMODULE) ? UNLOADMODULE : null,
-			vars: (self.VARSLIST) ? VARSLIST : null
-		};
-		this._loadedModules.push(module);
-		
-		if(self.VARSLIST) {
-			for(var i=0; i<VARSLIST.length; i++) {
-				if(this._moduleVars[VARSLIST[i]]) {
-					this._moduleVars[VARSLIST[i]]++;
-				} else {
-					this._moduleVars[VARSLIST[i]] = 1;
-				}
-			}
-			delete self.VARSLIST;
-		}
-		if(self.UNLOADMODULE) {
-			delete self.UNLOADMODULE;
-		}
-		if(self.LOADMODULE) {
-			LOADMODULE();
-			delete self.LOADMODULE;
-		}
-		return true;
-	},
-	
-	unload: function(aPath) {
-		for(var i = 0; i < this._loadedModules.length; i++) {
-			if(this._loadedModules[i].path == aPath) {
-				if(this._loadedModules[i].unload) {
-					this._loadedModules[i].unload();
-				}
-				if(this._loadedModules[i].vars) {
-					for(var o = 0; o < this._loadedModules[i].vars.length; o++) {
-						this.deleteVar(this._loadedModules[i].vars[o]);
-					}
-				}
-				this._loadedModules.splice(i, 1);
-				return true;
-			}
-		}
-		return false;
-	},
-	
-	loaded: function(aPath) {
-		for(var i = 0; i < this._loadedModules.length; i++) {
-			if(this._loadedModules[i].path == aPath) {
-				return true;
-			}
-		}
-		return false;
-	},
-	
-	deleteVar: function(aVar) {
-		if(this._moduleVars[aVar]) {
-			this._moduleVars[aVar]--;
-			if(this._moduleVars[aVar] == 0) {
-				delete self[aVar];
-				delete this._moduleVars[aVar];
-			}
-			return true;
-		}
-		return false;
-	}
-};
-delete self.mozIJSSubScriptLoader; // self removes unnecessary javascript warnings that show up in the console
 
 // This allows me to handle loading and unloading of stylesheets in a quick and easy way
 var styleAid = {
