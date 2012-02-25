@@ -1,11 +1,23 @@
 // Many times I can't use 'this' to refer to the owning var's context, so I'm setting 'this' as 'self', 
 // I can use 'self' from within functions, timers and listeners easily and to bind those functions to it as well
-var self = this;
+this.self = this;
 
 // Quick method to load subscripts into the context of "this"
-var moduleAid = {
+this.moduleAid = {
 	loader: mozIJSSubScriptLoader,
-	_loadedModules: [{ path: "resource://"+objPathString+"/modules/utils.jsm", unload: null, vars: null, version: '1.0.1' }],
+	_loadedModules: [{
+		path: "resource://"+objPathString+"/modules/utils.jsm",
+		unload: function() {
+			while(moduleAid._loadedModules.length > 1) {
+				moduleAid.unload(moduleAid._loadedModules[1].path);
+			}
+			timerAid.cancelAll();
+			listenerAid.clean();
+			observerAid.clean();
+		},
+		vars: ['hasAncestor', 'hideIt', 'modifyFunction', 'setWatchers', 'listenerAid', 'aSync', 'timerAid', 'prefAid', 'observerAid', 'privateBrowsingAid', 'styleAid', 'moduleAid', 'self'],
+		version: '1.0.2'
+	}],
 	_moduleVars: {},
 	
 	loadIf: function(aPath, anIf) {
@@ -32,13 +44,7 @@ var moduleAid = {
 		this._loadedModules.push(module);
 		
 		if(self.VARSLIST) {
-			for(var i=0; i<VARSLIST.length; i++) {
-				if(this._moduleVars[VARSLIST[i]]) {
-					this._moduleVars[VARSLIST[i]]++;
-				} else {
-					this._moduleVars[VARSLIST[i]] = 1;
-				}
-			}
+			this.createVars(VARSLIST);
 		}
 		if(self.LOADMODULE) {
 			LOADMODULE();
@@ -78,6 +84,16 @@ var moduleAid = {
 		return false;
 	},
 	
+	createVars: function(aList) {
+		for(var i=0; i<aList.length; i++) {
+			if(this._moduleVars[aList[i]]) {
+				this._moduleVars[aList[i]]++;
+			} else {
+				this._moduleVars[aList[i]] = 1;
+			}
+		}
+	},
+	
 	deleteVar: function(aVar) {
 		if(this._moduleVars[aVar]) {
 			this._moduleVars[aVar]--;
@@ -91,9 +107,10 @@ var moduleAid = {
 	}
 };
 delete self.mozIJSSubScriptLoader; // self removes unnecessary javascript warnings that show up in the console
+moduleAid.createVars(moduleAid._loadedModules[0].vars);
 
 // Checks if aNode decends from aParent
-var hasAncestor = function(aNode, aParent, aWindow) {
+this.hasAncestor = function(aNode, aParent, aWindow) {
 	if(!aNode || !aParent) { return false; };
 	
 	if(aNode == aParent) { return true; }
@@ -115,7 +132,7 @@ var hasAncestor = function(aNode, aParent, aWindow) {
 };
 
 // in theory this should collapse whatever I want
-var hideIt = function(aNode, show) {
+this.hideIt = function(aNode, show) {
 	if(!show) {
 		aNode.setAttribute('collapsed', 'true');
 	} else {
@@ -128,7 +145,7 @@ var hideIt = function(aNode, show) {
 // that is, while inside a function created by that method in a module loaded by moduleAid I can't call 'subObj' (as in 'mainObj.subObj') by itself as I normally do,
 // I have to either use 'mainObj.subObj' or 'this.subObj'; I try to avoid this as that is how I'm building my modularized add-ons, 
 // so I'm using eval, at least for now until I find a better way to implement this functionality.
-var modifyFunction = function(aOriginal, aArray) {
+this.modifyFunction = function(aOriginal, aArray) {
 	var newCode = aOriginal.toString();
 	for(var i=0; i < aArray.length; i++) {
 		newCode = newCode.replace(aArray[i][0], aArray[i][1].replace("{([objName])}", objName));
@@ -139,7 +156,7 @@ var modifyFunction = function(aOriginal, aArray) {
 };
 
 // This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
-var setWatchers = function(obj) {
+this.setWatchers = function(obj) {
 	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
 	if(	typeof(obj) != 'object' 
 		|| typeof(obj.addPropertyWatcher) != 'undefined'
@@ -356,7 +373,7 @@ var setWatchers = function(obj) {
 };
 
 // Object to aid in setting and removing all kind of listeners
-var listenerAid = {
+this.listenerAid = {
 	handlers: [],
 	
 	// if maxTriggers is set to the boolean false, it acts as a switch to not bind the function to our object
@@ -513,12 +530,12 @@ var listenerAid = {
 listenerAid.add(window, "unload", function() { listenerAid.clean(); }, false, true);
 
 // this lets me run functions asyncronously, basically it's a one shot timer with a delay of 0msec
-var aSync = function(aFunc) {
+this.aSync = function(aFunc) {
 	return timerAid.create(aFunc, 0);
 }
 
 // Object to aid in setting, initializing and cancelling timers
-var timerAid = {
+this.timerAid = {
 	_timers: {},
 	
 	init: function(aName, aFunc, aDelay, aType) {
@@ -531,7 +548,7 @@ var timerAid = {
 		};
 		this._timers[aName].timer.init(function(aSubject, aTopic, aData) {
 			timerAid._timers[aName].handler.call(self, aSubject, aTopic, aData);
-			if(aSubject.type == Components.interfaces.nsITimer.TYPE_ONE_SHOT) {
+			if(typeof(timerAid) != 'undefined' && aSubject.type == Components.interfaces.nsITimer.TYPE_ONE_SHOT) {
 				timerAid.cancel(aName);
 			}
 		}, aDelay, type);
@@ -548,6 +565,12 @@ var timerAid = {
 			return true;
 		}
 		return false;
+	},
+	
+	cancelAll: function() {
+		for(var timerObj in this._timers) {
+			this.cancel(timerObj);
+		}
 	},
 	
 	create: function(aFunc, aDelay, aType) {
@@ -583,8 +606,9 @@ var timerAid = {
 		return false;
 	}
 };
+listenerAid.add(window, 'unload', function() { timerAid.cancelAll(); }, false, true);
 
-var prefAid = {
+this.prefAid = {
 	_prefObjects: {},
 	length: 0,
 	
@@ -624,7 +648,7 @@ var prefAid = {
 };
 
 // Create the observer object from a function if that is what is provided and registers it
-var observerAid = {
+this.observerAid = {
 	// Since I'm immediatelly adding a 'quit-application' observer, I need the service right away, so no need in delaying it
 	obsService: Components.classes["@mozilla.org/observer-service;1"].getService(Components.interfaces.nsIObserverService),
 	observers: [],
@@ -685,7 +709,7 @@ listenerAid.add(window, "unload", function() { observerAid.clean(); }, false, tr
 
 // Private browsing mode listener as on https://developer.mozilla.org/En/Supporting_private_browsing_mode, with a few modifications
 // Prepares an object to be used as a pb listener, expects methods autoStarted, onEnter, onExit, onQuit and applies them accordingly
-var privateBrowsingAid = {
+this.privateBrowsingAid = {
 	pbService: null,
 	get autoStarted () { this.init(); return this.pbService.autoStarted; },
 	get inPrivateBrowsing () { this.init(); return this.pbService.privateBrowsingEnabled; },
@@ -738,7 +762,7 @@ var privateBrowsingAid = {
 };
 
 // This allows me to handle loading and unloading of stylesheets in a quick and easy way
-var styleAid = {
+this.styleAid = {
 	sss: null,
 	ios: null,
 	_loadedSheets: [],
