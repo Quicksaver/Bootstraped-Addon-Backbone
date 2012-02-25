@@ -7,6 +7,7 @@ this.moduleAid = {
 	loader: mozIJSSubScriptLoader,
 	_loadedModules: [{
 		path: "resource://"+objPathString+"/modules/utils.jsm",
+		load: null,
 		unload: function() {
 			while(moduleAid._loadedModules.length > 1) {
 				moduleAid.unload(moduleAid._loadedModules[1].path);
@@ -16,7 +17,8 @@ this.moduleAid = {
 			observerAid.clean();
 		},
 		vars: ['hasAncestor', 'hideIt', 'modifyFunction', 'setWatchers', 'listenerAid', 'aSync', 'timerAid', 'prefAid', 'observerAid', 'privateBrowsingAid', 'styleAid', 'moduleAid', 'self'],
-		version: '1.0.3'
+		version: '1.0.4',
+		loaded: false
 	}],
 	_moduleVars: {},
 	
@@ -37,11 +39,13 @@ this.moduleAid = {
 		
 		var module = {
 			path: aPath,
+			load: (self.LOADMODULE) ? LOADMODULE : null,
 			unload: (self.UNLOADMODULE) ? UNLOADMODULE : null,
 			vars: (self.VARSLIST) ? VARSLIST : null,
-			version: (self.VERSION) ? VERSION : null
+			version: (self.VERSION) ? VERSION : null,
+			loaded: false
 		};
-		this._loadedModules.push(module);
+		var moduleIndex = this._loadedModules.push(module) -1;
 		
 		if(self.VARSLIST) {
 			this.createVars(VARSLIST);
@@ -49,8 +53,12 @@ this.moduleAid = {
 		if(self.LOADMODULE) {
 			if(!delayed) {
 				LOADMODULE();
+				this._loadedModules[moduleIndex].loaded = true;
 			} else {
-				aSync(LOADMODULE, 500);
+				aSync(function() {
+					moduleAid._loadedModules[moduleIndex].load.call(self);
+					moduleAid._loadedModules[moduleIndex].loaded = true; 
+				}, 500);
 			}
 		}
 		
@@ -825,3 +833,5 @@ this.styleAid = {
 		return aPath;
 	}
 };
+
+moduleAid._loadedModules[0].loaded = true;
