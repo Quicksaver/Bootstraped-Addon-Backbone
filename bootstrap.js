@@ -15,7 +15,7 @@
 //	see prepareObject()
 // disable() - disables the add-on
 
-let bootstrapVersion = '1.0.0';
+let bootstrapVersion = '1.0.1';
 let unloaded = false;
 let started = false;
 let addonData = null;
@@ -31,7 +31,7 @@ XPCOMUtils.defineLazyServiceGetter(Services, "stylesheet", "@mozilla.org/content
 function prepareObject(window, aName) {
 	// I can override the object name if I want
 	let objectName = aName || objName;
-	if(window[objectName]) { return window[objectName]; }
+	if(window[objectName]) { return; }
 	
 	window[objectName] = {
 		objName: objectName,
@@ -45,8 +45,6 @@ function prepareObject(window, aName) {
 	
 	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/moduleAid.jsm", window[objectName]);
 	window[objectName].moduleAid.load("utils");
-	
-	return window[objectName];
 }
 
 function removeObject(window, aName) {

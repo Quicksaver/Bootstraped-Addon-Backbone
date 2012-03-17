@@ -1,6 +1,6 @@
 // Many times I can't use 'this' to refer to the owning var's context, so I'm setting 'this' as 'self', 
 // I can use 'self' from within functions, timers and listeners easily and to bind those functions to it as well
-var self = this;
+this.self = this;
 
 // moduleAid - Helper to load subscripts into the context of "this"
 // load(aModule, delayed) - loads aModule onto the context of self
@@ -18,8 +18,8 @@ var self = this;
 //	moduleAid.VARSLIST - (array) list with all the objects the module inserts into the object when loaded, for easy unloading
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
-var moduleAid = {
-	version: '2.0.0',
+this.moduleAid = {
+	version: '2.0.1',
 	modules: [],
 	moduleVars: {},
 	

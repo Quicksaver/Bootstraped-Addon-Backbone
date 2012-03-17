@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.0';
+moduleAid.VERSION = '1.1.1';
 moduleAid.VARSLIST = ['modifyFunction', 'listenerAid', 'aSync', 'timerAid'];
 
 // modifyFunction(aOriginal, aArray) - allows me to modify a function quickly from within my scripts
@@ -91,11 +91,6 @@ this.listenerAid = {
 		var i = 0;
 		while(i < this.handlers.length) {
 			if(this.handlers[i].obj) {
-				if(this.handlers[i].obj == window && this.handlers[i].type == 'unload' && !this.handlers[i].capture) {
-					i++;
-					continue;
-				}
-				
 				if(this.handlers[i].obj.removeEventListener) {
 					this.handlers[i].obj.removeEventListener(this.handlers[i].type, this.handlers[i].listener, this.handlers[i].capture);
 				}

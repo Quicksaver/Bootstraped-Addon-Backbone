@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.0';
+moduleAid.VERSION = '1.0.1';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -105,8 +105,8 @@ this.prefAid = {
 		}
 	},
 	
-	cleanListeners: function() {
-		for(var i = 0; i < this._prefObjects.length; i++) {
+	clean: function() {
+		for(var pref in this._prefObjects) {
 			this._prefObjects[pref].events.removeListener("change", this.prefChanged);
 		}
 	}
@@ -484,6 +484,10 @@ this.overlayAid = {
 	},
 	
 	unOverlayURI: function(aURI, aWith) {
+		// I sometimes call unOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
+		// This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
+		if(unloaded) { return; }
+		
 		var path = this.getPath(aWith);
 		var i = this.loaded(aURI, path);
 		if(i === false) { return; }
@@ -1203,7 +1207,7 @@ this.setWatchers = function(obj, remove) {
 			properties: {},
 			attributes: {},
 			callAttrWatchers: function(attr, newVal, capture) {
-				if(typeof(this.attributes[attr]) == 'undefined') { return; }
+				if(typeof(this.attributes[attr]) == 'undefined') { return true; }
 				
 				var oldVal = this.attributes[attr].value;
 				
@@ -1350,13 +1354,13 @@ this.setWatchers = function(obj, remove) {
 		this._propWatchers.callAttrWatchers(attr, value, false);
 	};
 	obj.setAttributeNode = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return; }
+		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
 		var ret = this._setAttributeNode(attr);
 		this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
 		return ret;
 	};
 	obj.setAttributeNodeNS = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return; }
+		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
 		var ret = this._setAttributeNodeNS(attr);
 		this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
 		return ret;
@@ -1372,7 +1376,7 @@ this.setWatchers = function(obj, remove) {
 		this._propWatchers.callAttrWatchers(attr, null, false);
 	};
 	obj.removeAttributeNode = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, null, true)) { return; }
+		if(!this._propWatchers.callAttrWatchers(attr.name, null, true)) { return null; }
 		var ret = this._removeAttributeNode(attr);
 		this._propWatchers.callAttrWatchers(attr.name, null, false);
 		return ret;
@@ -1447,5 +1451,5 @@ moduleAid.UNLOADMODULE = function() {
 	observerAid.clean();
 	windowMediator.callOnAll(overlayAid.unloadAll);
 	Services.ww.unregisterNotification(windowMediator.callWatchers);
-	prefAid.cleanListeners();
+	prefAid.clean();
 };
