@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.1';
+moduleAid.VERSION = '1.0.2';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -1193,7 +1193,7 @@ this.setWatchers = function(obj, remove) {
 		delete obj._removeAttribute;
 		delete obj._removeAttributeNS;
 		delete obj._removeAttributeNode;
-		delete obj.addAttributeWathcer;
+		delete obj.addAttributeWatcher;
 		delete obj.removeAttributeWatcher;
 		
 		delete obj._propWatchers;
