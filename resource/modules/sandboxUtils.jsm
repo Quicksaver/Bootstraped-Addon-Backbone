@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.2';
+moduleAid.VERSION = '1.0.3';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -209,13 +209,15 @@ this.styleAid = {
 // windowMediator - Aid object to help with window tasks involving window-mediator and window-watcher
 // getEnumerator(aType) - returns an nsISimpleEnumerator object with all windows of aType
 //	(optional) aType - (string) window type to get, defaults to null (all)
-// callOnAll(aCallback, aType, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
+// callOnMostRecent(aCallback, aType) - calls aCallback passing it the most recent window of aType as an argument
 //	aCallback - (function(window)) to be called on window
-//	(optional) aType - type of windows to execute the callback on, defaults to null (all)
+//	(optional) aType - type of windows to execute aCallback on, defaults to null (all)
+// callOnAll(aCallback, aType, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
 //	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+//	see callOnMostRecent()
 // callOnLoad(window, aCallback, aType) - calls aCallback when load event is fired on that window
 //	window - (xul object) window object to execute aCallback on
-//	see callOnAll()
+//	see callOnMostRecent()
 // register(aHandler, aTopic) - registers aHandler to be notified of every aTopic
 //	aHandler - (function) handler to be fired
 //	aTopic - (string) "domwindowopened" or (string) "domwindowclosed"
@@ -229,6 +231,14 @@ this.windowMediator = {
 	getEnumerator: function(aType) {
 		var type = aType || null;
 		return Services.wm.getEnumerator(type);
+	},
+	
+	callOnMostRecent: function(aCallback, aType) {
+		var type = aType || null;
+		var window = Services.wm.getMostRecentWindow(aType);
+		if(window) {
+			aCallback(window);
+		}
 	},
 	
 	// expects aCallback() and sets its this as the window
