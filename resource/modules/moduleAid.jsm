@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.1',
+	version: '2.0.2',
 	modules: [],
 	moduleVars: {},
 	
@@ -33,11 +33,15 @@ this.moduleAid = {
 	
 	load: function(aModule, delayed) {
 		var path = this.preparePath(aModule);
-		if(this.loaded(path) != false) {
+		if(!path || this.loaded(path) !== false) {
 			return false;
 		}
 		
-		Services.scriptloader.loadSubScript(path, self);
+		try { Services.scriptloader.loadSubScript(path, self); }
+		catch(ex) {
+			Cu.reportError(ex);
+			return false;
+		}
 		
 		var module = {
 			name: aModule,
@@ -46,48 +50,73 @@ this.moduleAid = {
 			unload: (this.UNLOADMODULE) ? this.UNLOADMODULE : null,
 			vars: (this.VARSLIST) ? this.VARSLIST : null,
 			version: (this.VERSION) ? this.VERSION : null,
-			loaded: false
+			loaded: false,
+			failed: false
 		};
-		var moduleIndex = this.modules.push(module) -1;
-		
-		if(this.VARSLIST) {
-			this.createVars(this.VARSLIST);
-		}
-		if(this.LOADMODULE) {
-			if(!delayed) {
-				this.LOADMODULE();
-				this.modules[moduleIndex].loaded = true;
-			} else {
-				aSync(function() {
-					moduleAid.modules[moduleIndex].load.call(self);
-					moduleAid.modules[moduleIndex].loaded = true; 
-				}, 500);
-			}
-		}
-		else {
-			this.modules[moduleIndex].loaded = true;
-		}
+		var i = this.modules.push(module) -1;
 		
 		delete this.VARSLIST;
 		delete this.LOADMODULE;
 		delete this.UNLOADMODULE;
 		delete this.VERSION;
+		
+		try { this.createVars(this.modules[i].vars); }
+		catch(ex) {
+			Cu.reportError(ex);
+			this.unload(aModule, true, true);
+			return false;
+		}
+		
+		if(this.modules[i].load) {
+			if(!delayed) {
+				try { this.modules[i].load(); }
+				catch(ex) {
+					Cu.reportError(ex);
+					this.unload(aModule, true);
+					return false;
+				}
+				this.modules[i].loaded = true;
+			} else {
+				aSync(function() {
+					try { moduleAid.modules[i].load(); }
+					catch(ex) {
+						Cu.reportError(ex);
+						this.unload(aModule, true);
+						return false;
+					}	
+					moduleAid.modules[i].loaded = true; 
+				}, 500);
+			}
+		}
+		else {
+			this.modules[i].loaded = true;
+		}
+		
 		return true;
 	},
 	
-	unload: function(aModule) {
+	unload: function(aModule, force, justVars) {
 		var path = this.preparePath(aModule);
+		if(!path) { return false; }
 		
 		var i = this.loaded(aModule);
 		if(i !== false) {
-			if(this.modules[i].unload && this.modules[i].loaded) {
-				this.modules[i].unload();
-			}
-			if(this.modules[i].vars) {
-				for(var o = 0; o < this.modules[i].vars.length; o++) {
-					this.deleteVar(this.modules[i].vars[o]);
+			if(!justVars && this.modules[i].unload && (this.modules[i].loaded || force)) {
+				try { this.modules[i].unload(); }
+				catch(ex) {
+					if(!force) { Cu.reportError(ex); }
+					this.modules[i].failed = true;
+					return false;
 				}
 			}
+			
+			try { this.deleteVars(this.modules[i].vars); }
+			catch(ex) {
+				if(!force) { Cu.reportError(ex); }
+				this.modules[i].failed = true;
+				return false;
+			}
+			
 			this.modules.splice(i, 1);
 			return true;
 		}
@@ -111,6 +140,8 @@ this.moduleAid = {
 	},
 	
 	createVars: function(aList) {
+		if(!Array.isArray(aList)) { return; }
+		
 		for(var i=0; i<aList.length; i++) {
 			if(this.moduleVars[aList[i]]) {
 				this.moduleVars[aList[i]]++;
@@ -120,22 +151,23 @@ this.moduleAid = {
 		}
 	},
 	
-	deleteVar: function(aVar) {
-		if(this.moduleVars[aVar]) {
-			this.moduleVars[aVar]--;
-			if(this.moduleVars[aVar] == 0) {
-				delete self[aVar];
-				delete this.moduleVars[aVar];
+	deleteVars: function(aList) {
+		if(!Array.isArray(aList)) { return; }
+		
+		for(var o = 0; o < aList.length; o++) {
+			if(this.moduleVars[aList[o]]) {
+				this.moduleVars[aList[o]]--;
+				if(this.moduleVars[aList[o]] == 0) {
+					delete self[aList[o]];
+					delete this.moduleVars[aList[o]];
+				}
 			}
-			return true;
 		}
-		return false;
 	},
 	
 	preparePath: function(aModule) {
-		if(aModule.indexOf("resource://") === 0) {
-			return aModule;
-		}
+		if(typeof(aModule) != 'string') { return null; }
+		if(aModule.indexOf("resource://") === 0) { return aModule; }
 		return "resource://"+objPathString+"/modules/"+aModule+".jsm";
 	}
 };
