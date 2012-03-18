@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.0.3';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
+moduleAid.VERSION = '1.0.4';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -293,6 +293,11 @@ this.windowMediator = {
 		return false;
 	}
 };
+
+// window - Similarly to windowMediator.callOnMostRecent, the window property returns the most recent navigator:browser window object
+// document - Returns the document object associated with the most recent window object
+this.__defineGetter__('window', function() { return Services.wm.getMostRecentWindow('navigator:browser'); });
+this.__defineGetter__('document', function() { return window.document; });
 
 // observerAid - Helper for adding and removing observers
 // add(anObserver, aTopic, ownsWeak) - Create the observer object from a function if that is what is provided and registers it
