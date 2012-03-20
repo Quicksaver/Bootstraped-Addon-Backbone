@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.4';
+moduleAid.VERSION = '1.0.5';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -1088,26 +1088,42 @@ this.overlayAid = {
 
 // stringsAid - use for getting strings out of bundles from .properties locale files
 // get(bundle, string, replace) - returns the desired string
-//	bundle - (string) name of the bundle to retrieve the string from, this can be an absolute path to the file or just aBundle in chrome://objPathString/locale/aBundle.properties
+//	bundle - (string) name of the bundle to retrieve the string from, just aBundle in chrome://objPathString/locale/aBundle.properties
 //	string - (string) name of the string to retrieve from bundle
 //	(optional) replace - (array) [ [original, new] x n ] retrieves the string with the occurences of original replaced with new
+//	(dont set) alt - don't set this variable, it is for internal use so the method know it needs to look in a special location for en locales, like in the case of
+//			 untranslated strings, this should be set in chrome.manifest as objPathString-en to the en-US locale.
 this.stringsAid = {
 	bundles: {},
 	
-	getPath: function(aPath) {
-		return (aPath.indexOf("chrome://") === 0) ? aPath : "chrome://"+objPathString+"/locale/"+aPath+".properties";
+	getPath: function(aPath, alt) {
+		return "chrome://"+objPathString+((alt) ? '-en' : '')+"/locale/"+aPath+".properties";
 	},
 	
-	get: function(bundle, string, replace) {
-		if(!this.bundles[bundle]) {
-			this.bundles[bundle] = Services.strings.createBundle(this.getPath(bundle));
+	get: function(bundle, string, replace, alt) {
+		var bundleObj = bundle;
+		if(alt) { bundleObj += '-en'; }
+		
+		if(!this.bundles[bundleObj]) {
+			this.bundles[bundleObj] = Services.strings.createBundle(this.getPath(bundle, alt));
 		}
 		
-		string = this.bundles[bundle].GetStringFromName(string);
+		try { string = this.bundles[bundleObj].GetStringFromName(string); }
+		catch(ex) {
+			var myex = 'Failed loading string from properties file. [File name: '+bundle+'] [String name: '+string+']';
+			if(alt) { myex += ' [Failed en backup]'; }
+			Cu.reportError(myex);
+			if(!alt) {
+				try { return this.get(bundle, string, replace, true); }
+				catch(exx) { return ''; }
+			}
+		}
 		
 		if(replace) {
 			for(var i = 0; i < replace.length; i++) {
-				string.replace(replace[i][0], replace[i][1]);
+				while(string.indexOf(replace[i][0] > -1)) {
+					string.replace(replace[i][0], replace[i][1]);
+				}
 			}
 		}
 		
