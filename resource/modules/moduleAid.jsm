@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.2',
+	version: '2.0.3',
 	modules: [],
 	moduleVars: {},
 	
@@ -82,7 +82,7 @@ this.moduleAid = {
 					catch(ex) {
 						Cu.reportError(ex);
 						this.unload(aModule, true);
-						return false;
+						return;
 					}	
 					moduleAid.modules[i].loaded = true; 
 				}, 500);

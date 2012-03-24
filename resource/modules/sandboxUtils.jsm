@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.5';
+moduleAid.VERSION = '1.0.6';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -1110,13 +1110,24 @@ this.stringsAid = {
 		
 		try { string = this.bundles[bundleObj].GetStringFromName(string); }
 		catch(ex) {
-			var myex = 'Failed loading string from properties file. [File name: '+bundle+'] [String name: '+string+']';
-			if(alt) { myex += ' [Failed en backup]'; }
-			Cu.reportError(myex);
 			if(!alt) {
-				try { return this.get(bundle, string, replace, true); }
-				catch(exx) { return ''; }
+				var myex = 'Failed to load string from properties file. [Addon: '+objPathString+'] [File: '+bundle+'] [String: '+string+']';
+				try {
+					string = this.get(bundle, string, replace, true);
+					if(string !== null) {
+						Services.console.logStringMessage(myex + ' [Successfully loaded en backup]');
+					} else {
+						Cu.reportError(myex + ' [Failed to load en backup]');
+						string = '';
+					}
+					return string;
+				}
+				catch(exx) {
+					Cu.reportError(myex + ' [Failed to load en backup]');
+					return '';
+				}
 			}
+			else { return null; }
 		}
 		
 		if(replace) {
