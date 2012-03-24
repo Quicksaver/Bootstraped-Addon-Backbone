@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.7';
+moduleAid.VERSION = '1.0.8';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -255,12 +255,11 @@ this.windowMediator = {
 	},
 	
 	callOnLoad: function(window, aCallback, aType) {
-		window.addEventListener('load', function runOnce() {
-			window.removeEventListener('load', runOnce, false);
+		listenOnce(window, "load", function(event, window) {
 			if(!unloaded && (!aType || window.document.documentElement.getAttribute('windowtype') == aType)) {
 				aCallback(window);
 			}
-		}, false);
+		});
 	},
 	
 	register: function(aHandler, aTopic) {
@@ -1200,7 +1199,7 @@ this.aSync = function(aFunc, aDelay) {
 // Note: deleting a watched property does not trigger the watchers, so don't do it. Also setting the watchers on an unset property won't work either.
 // I can't do anything when setting attributes from within the .attributes element property.
 this.setWatchers = function(obj, remove) {
-	if(typeof(obj) != 'object') { return; }
+	if(typeof(obj) != 'object' || obj === null) { return; }
 	
 	if(remove) {
 		if(!obj._propWatchers) { return; }

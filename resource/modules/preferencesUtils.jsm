@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.0.0';
-moduleAid.VARSLIST = [];
+moduleAid.VERSION = '1.0.1';
+moduleAid.VARSLIST = ['dependsOn'];
 
 // dependsOn - object that adds a dependson attribute functionality to xul preference elements.
 // Just add the attribute to the desired xul element and let the script do its thing. dependson accepts comma-separated strings in the following format:
@@ -85,10 +85,9 @@ this.dependsOn = {
 				dependency[1] = trim(dependency[1]);
 			}
 			
-			if(document.getElementById(dependency[0]).localName == 'preference') {
-				var pref = document.getElementById(dependency[0]);
-			} else {
-				var pref = document.getElementById(document.getElementById(dependency[0]).getAttribute('preference'));
+			var pref = document.getElementById(dependency[0]);
+			if(pref.localName != 'preference') {
+				pref = document.getElementById(pref.getAttribute('preference'));
 			}
 			switch(pref.type) {
 				case 'int':

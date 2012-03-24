@@ -13,9 +13,14 @@
 //	see prepareObject()
 // preparePreferences(window, aName) - loads the preferencesUtils module into that window's object initialized by prepareObject() (if it hasn't yet, it will be initialized)
 //	see prepareObject()
+// listenOnce(window, type, handler, capture) - adds handler to window listening to event type that will be removed after one execution.
+//	window - (xul object) the window object to add the handler to
+//	type - (string) event type to listen to
+//	handler - (function(event, window)) - method to be called when event is triggered
+//	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
 
-let bootstrapVersion = '1.0.1';
+let bootstrapVersion = '1.0.2';
 let unloaded = false;
 let started = false;
 let addonData = null;
@@ -63,6 +68,15 @@ function preparePreferences(window, aName) {
 		prepareObject(window, objectName);
 	}
 	window[objectName].moduleAid.load("preferencesUtils");
+}
+
+function listenOnce(window, type, handler, capture) {
+	window.addEventListener(type, function runOnce(event) {
+		window.removeEventListener(type, runOnce, capture);
+		if(!unloaded) {
+			handler(event, window);
+		}
+	}, capture);
 }
 
 function setDefaults() {
