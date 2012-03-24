@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.6';
+moduleAid.VERSION = '1.0.7';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -1494,4 +1494,5 @@ moduleAid.UNLOADMODULE = function() {
 	windowMediator.callOnAll(overlayAid.unloadAll);
 	Services.ww.unregisterNotification(windowMediator.callWatchers);
 	prefAid.clean();
+	moduleAid.clean();
 };
