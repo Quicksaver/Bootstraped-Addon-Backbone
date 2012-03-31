@@ -20,7 +20,7 @@
 //	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
 
-let bootstrapVersion = '1.0.2';
+let bootstrapVersion = '1.0.3';
 let unloaded = false;
 let started = false;
 let addonData = null;
@@ -45,7 +45,8 @@ function prepareObject(window, aName) {
 		// every supposedly global variable is inaccessible because bootstraped means sandboxed, so I have to reference all these;
 		// it's easier to reference more specific objects from within the modules for better control, only setting these two here because they're more generalized
 		window: window,
-		get document () { return window.document; }
+		get document () { return window.document; },
+		$: function(id) { return window.document.getElementById(id); }
 	};
 	
 	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/moduleAid.jsm", window[objectName]);
