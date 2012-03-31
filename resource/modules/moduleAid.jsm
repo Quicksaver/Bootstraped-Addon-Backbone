@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.3',
+	version: '2.0.4',
 	modules: [],
 	moduleVars: {},
 	
@@ -81,7 +81,7 @@ this.moduleAid = {
 					try { moduleAid.modules[i].load(); }
 					catch(ex) {
 						Cu.reportError(ex);
-						this.unload(aModule, true);
+						moduleAid.unload(aModule, true);
 						return;
 					}	
 					moduleAid.modules[i].loaded = true; 
@@ -100,33 +100,36 @@ this.moduleAid = {
 		if(!path) { return false; }
 		
 		var i = this.loaded(aModule);
-		if(i !== false) {
-			if(!justVars && this.modules[i].unload && (this.modules[i].loaded || force)) {
-				try { this.modules[i].unload(); }
-				catch(ex) {
-					if(!force) { Cu.reportError(ex); }
-					this.modules[i].failed = true;
-					return false;
-				}
-			}
-			
-			try { this.deleteVars(this.modules[i].vars); }
+		if(i === false) { return false; }
+		
+		if(!justVars && this.modules[i].unload && (this.modules[i].loaded || force)) {
+			try { this.modules[i].unload(); }
 			catch(ex) {
 				if(!force) { Cu.reportError(ex); }
 				this.modules[i].failed = true;
 				return false;
 			}
-			
-			this.modules.splice(i, 1);
-			return true;
 		}
 		
-		return false;
+		try { this.deleteVars(this.modules[i].vars); }
+		catch(ex) {
+			if(!force) { Cu.reportError(ex); }
+			this.modules[i].failed = true;
+			return false;
+		}
+		
+		this.modules.splice(i, 1);
+		return true;
 	},
 	
 	clean: function() {
-		while(moduleAid.modules.length > 1) {
-			moduleAid.unload(moduleAid.modules[1].name);
+		// We can't unload modules in i++ mode for two reasons:
+		// One: dependencies, some modules require others to run, so by unloading in the inverse order they were loaded we are assuring dependencies are maintained
+		// Two: creates endless loops when unloading a module failed, it would just keep trying to unload that module
+		var i = moduleAid.modules.length -1;
+		while(i > 0) {
+			moduleAid.unload(moduleAid.modules[i].name);
+			i--;
 		}
 	},
 	
