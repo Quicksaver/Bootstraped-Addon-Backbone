@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.8';
+moduleAid.VERSION = '1.0.9';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -577,7 +577,7 @@ this.overlayAid = {
 		if(window._OVERLAYS_LOADED) {
 			for(var o = window._OVERLAYS_LOADED.length -1; o >= 0; o--) {
 				var isFromHere = false;
-				for(var i = 0; i < overlayAid.overlays[i].length; i++) {
+				for(var i = 0; i < overlayAid.overlays.length; i++) {
 					if(window._OVERLAYS_LOADED[o].uri == overlayAid.overlays[i].uri) {
 						isFromHere = true;
 						break;
