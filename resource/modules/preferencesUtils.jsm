@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.1';
+moduleAid.VERSION = '1.0.2';
 moduleAid.VARSLIST = ['dependsOn'];
 
 // dependsOn - object that adds a dependson attribute functionality to xul preference elements.
@@ -15,13 +15,13 @@ moduleAid.VARSLIST = ['dependsOn'];
 //		!element5:someOtherValue - checks if element5 has any value other than 'someOtherValue'
 this.dependsOn = {
 	getAll: function() {
-		return document.getElementsByAttribute('dependson', '*');
+		return $$("[dependson]");
 	},
 	
 	changed: function(e) {
 		if(e.target.localName != 'preference' || !e.target.id) { return; }
 		
-		var fields = document.getElementsByAttribute('preference', e.target.id);
+		var fields = $$("[preference='"+e.target.id+"']");
 		var elements = dependsOn.getAll();
 		var alreadyChanged = [];
 		
@@ -85,9 +85,9 @@ this.dependsOn = {
 				dependency[1] = trim(dependency[1]);
 			}
 			
-			var pref = document.getElementById(dependency[0]);
+			var pref = $(dependency[0]);
 			if(pref.localName != 'preference') {
-				pref = document.getElementById(pref.getAttribute('preference'));
+				pref = $(pref.getAttribute('preference'));
 			}
 			switch(pref.type) {
 				case 'int':
