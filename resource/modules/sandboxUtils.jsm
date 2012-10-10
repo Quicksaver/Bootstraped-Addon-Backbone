@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.9';
+moduleAid.VERSION = '1.0.10';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -212,12 +212,13 @@ this.styleAid = {
 // callOnMostRecent(aCallback, aType) - calls aCallback passing it the most recent window of aType as an argument
 //	aCallback - (function(window)) to be called on window
 //	(optional) aType - type of windows to execute aCallback on, defaults to null (all)
-// callOnAll(aCallback, aType, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
-//	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+// callOnAll(aCallback, aType, aURI, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
+//	(optional) aURI - (string) when defined, checks the documentURI property against the aURI value and only executes aCallback when true, defaults to null
+//	(optional) beforeComplete - (bool) true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
 //	see callOnMostRecent()
-// callOnLoad(window, aCallback, aType) - calls aCallback when load event is fired on that window
+// callOnLoad(window, aCallback, aType, aURI) - calls aCallback when load event is fired on that window
 //	window - (xul object) window object to execute aCallback on
-//	see callOnMostRecent()
+//	see callOnMostRecent() and callOnAll
 // register(aHandler, aTopic) - registers aHandler to be notified of every aTopic
 //	aHandler - (function) handler to be fired
 //	aTopic - (string) "domwindowopened" or (string) "domwindowclosed"
@@ -242,21 +243,26 @@ this.windowMediator = {
 	},
 	
 	// expects aCallback() and sets its this as the window
-	callOnAll: function(aCallback, aType, beforeComplete) {
+	callOnAll: function(aCallback, aType, aURI, beforeComplete) {
 		var browserEnumerator = this.getEnumerator(aType);
 		while(browserEnumerator.hasMoreElements()) {
 			var window = browserEnumerator.getNext();
-			if(window.document.readyState == "complete" || beforeComplete) {
-				aCallback(window);
-			} else {
-				this.callOnLoad(window, aCallback);
+			if(!aURI || window.document.documentURI == aURI) {
+				if(window.document.readyState == "complete" || beforeComplete) {
+					aCallback(window);
+				} else {
+					this.callOnLoad(window, aCallback);
+				}
 			}
 		}
 	},
 	
-	callOnLoad: function(window, aCallback, aType) {
+	callOnLoad: function(window, aCallback, aType, aURI) {
 		listenOnce(window, "load", function(event, window) {
-			if(!unloaded && (!aType || window.document.documentElement.getAttribute('windowtype') == aType)) {
+			if(unloaded) { return; }
+			
+			if((!aType || window.document.documentElement.getAttribute('windowtype') == aType)
+			&& (!aURI || window.document.documentURI == aURI)) {
 				aCallback(window);
 			}
 		});
@@ -456,7 +462,7 @@ this.privateBrowsingAid = {
 // Elements with a getchildrenof attribute will inherit all the children from the elements specified by the comma-separated list of element ids.
 // Every occurence of (string) objName and (string) objPathString in every attribute in the overlay will be properly replaced with this object's objName and objPathString.
 // I can also overlay other overlays provided they are loaded through the overlayAid object (either from this add-on or another implementing it).
-// overlayURI(aURI, aWith, onload, onunload) - overlays aURI with aWith
+// overlayURI(aURI, aWith, beforeload, onload, onunload) - overlays aURI with aWith
 //	aURI - (string) uri to be overlayed
 //	aWith - (string) uri to overlay aURI, can be fileName found as chrome://objPathString/content/fileName.xul or already the full uri path
 //	(optional) beforeload ( function(window) ) is called before the window is overlayed, expects a (object) window argument
@@ -743,6 +749,42 @@ this.overlayAid = {
 					case 'sizeToContent':
 						window.sizeToContent();
 						break;
+					
+					case 'appendButton':
+						this.closeCustomize();
+						
+						if(action.node) {
+							action.node = action.node.parentNode.removeChild(action.node);
+						}
+						break;
+					
+					case 'removeButton':
+						this.closeCustomize();
+						
+						if(action.node && action.palette) {
+							action.node = action.palette.appendChild(action.node);
+							
+							var toolbars = window.document.querySelectorAll("toolbar");
+							toolbar_loop: for(var a=0; a<toolbars.length; a++) {
+								if(toolbars[a].getAttribute('currentset').indexOf(action.node.id) > -1) {
+									var currentset = toolbars[a].getAttribute('currentset').split(",");
+									for(var e=0; e<currentset.length; e++) {
+										if(currentset[e] == action.node.id) {
+											for(var l=e+1; l<currentset.length; l++) {
+												var beforeEl = window.document.getElementById(currentset[l]);
+												if(beforeEl) {
+													toolbars[a].insertItem(action.node.id, beforeEl);
+													break toolbar_loop;
+												}
+											}
+											toolbars[a].insertItem(action.node.id, null, null, false);
+											break toolbar_loop;
+										}
+									}
+								}
+							}
+						}
+						break;
 						
 					default: break;
 				}
@@ -853,6 +895,59 @@ this.overlayAid = {
 			
 			// No id means the node won't be processed
 			if(!overlayNode.id) { continue; }
+			
+			// Correctly add or remove toolbar buttons to the toolbox palette
+			if(overlayNode.nodeName == 'toolbarpalette') {
+				var toolbox = window.document.querySelectorAll('toolbox');
+				for(var a=0; a<toolbox.length; a++) {
+					if(toolbox[a].palette && toolbox[a].palette.id == overlayNode.id) {
+						buttons_loop: for(var e=0; e<overlayNode.childNodes.length; e++) {
+							var button = window.document.importNode(overlayNode.childNodes[e]);
+							if(button.id) {
+								// change or remove the button on the toolbar if it is found in the document
+								var existButton = window.document.getElementById(button.id);
+								if(existButton) {
+									if(button.getAttribute('removeelement') == 'true') {
+										this.removeButton(window, toolbox[a].palette, existButton);
+										continue buttons_loop;
+									}
+									
+									for(var c=0; c<button.attributes.length; c++) {
+										// Why bother, id is the same already
+										if(button.attributes[c].name == 'id') { continue; }
+										
+										this.setAttribute(window, existButton, button.attributes[c]);
+									}
+									continue buttons_loop;
+								}
+								
+								// change or remove in the palette if it exists there
+								for(var b=0; b<toolbox[a].palette.childNodes.length; b++) {
+									if(toolbox[a].palette.childNodes[b].id == button.id) {
+										if(button.getAttribute('removeelement') == 'true') {
+											this.removeButton(window, toolbox[a].palette, toolbox[a].palette.childNodes[b]);
+											continue buttons_loop;
+										}
+										
+										for(var c=0; c<button.attributes.length; c++) {
+											// Why bother, id is the same already
+											if(button.attributes[c].name == 'id') { continue; }
+											
+											this.setAttribute(window, toolbox[a].palette.childNodes[b], button.attributes[c]);
+										}
+										continue buttons_loop;
+									}
+								}
+								
+								// add the button if not found either in a toolbar or the palette
+								this.appendButton(window, toolbox[a].palette, button);
+							}
+						}
+						break;
+					}
+				}
+				continue;
+			}
 			
 			var node = window.document.getElementById(overlayNode.id);
 			// Handle if node with same id was found
@@ -1082,7 +1177,47 @@ this.overlayAid = {
 			try { window.sizeToContent(); } catch(ex) {}
 			this.traceBack(window, { action: 'sizeToContent' }, true);
 		}
-	}	
+	},
+	
+	appendButton: function(window, palette, node) {
+		this.closeCustomize();
+		
+		var node = palette.appendChild(node);
+		
+		var toolbars = window.document.querySelectorAll("toolbar");
+		toolbar_loop: for(var a=0; a<toolbars.length; a++) {
+			if(toolbars[a].getAttribute('currentset').indexOf(node.id) > -1) {
+				var currentset = toolbars[a].getAttribute('currentset').split(",");
+				for(var e=0; e<currentset.length; e++) {
+					if(currentset[e] == node.id) {
+						for(var i=e+1; i<currentset.length; i++) {
+							var beforeEl = window.document.getElementById(currentset[i]);
+							if(beforeEl) {
+								toolbars[a].insertItem('omnisidebar_button', beforeEl);
+								break toolbar_loop;
+							}
+						}
+						toolbars[a].insertItem('omnisidebar_button', null, null, false);
+						break toolbar_loop;
+					}
+				}
+			}
+		}
+		
+		this.traceBack(window, { action: 'appendButton', node: node });
+		return node;
+	},
+	
+	removeButton: function(window, palette, node) {
+		this.closeCustomize();
+		
+		node = node.parentNode.removeChild(node);
+		this.traceBack(window, { action: 'removeButton', node: node, palette: palette });
+	},
+	
+	closeCustomize: function() {
+		windowMediator.callOnAll(function(window) { window.close(); }, null, "chrome://global/content/customizeToolbar.xul");
+	}
 };
 
 // stringsAid - use for getting strings out of bundles from .properties locale files
