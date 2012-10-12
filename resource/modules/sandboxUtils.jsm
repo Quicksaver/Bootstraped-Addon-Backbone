@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.10';
+moduleAid.VERSION = '1.0.11';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -489,7 +489,8 @@ this.overlayAid = {
 			beforeload: beforeload || null,
 			onload: onload || null,
 			onunload: onunload || null,
-			document: null
+			document: null,
+			persist: { length: 0 }
 			
 		};
 		var i = this.overlays.push(newOverlay) -1;
@@ -497,7 +498,7 @@ this.overlayAid = {
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
 				overlayAid.overlays[i].document = xmlhttp.responseXML;
-				overlayAid.cleanXUL(overlayAid.overlays[i].document);
+				overlayAid.cleanXUL(overlayAid.overlays[i].document, i);
 				windowMediator.callOnAll(overlayAid.scheduleWindow);
 			}
 		});
@@ -519,15 +520,24 @@ this.overlayAid = {
 		});
 	},	
 	
-	cleanXUL: function(node) {
+	cleanXUL: function(node, i) {
 		// Replace objName with this objName in every attribute
 		if(node.attributes) {
-			for(var i = 0; i < node.attributes.length; i++) {
-				while(node.attributes[i].value.indexOf('objName') > -1) {
-					node.attributes[i].value = node.attributes[i].value.replace('objName', objName);
+			for(var a = 0; a < node.attributes.length; a++) {
+				while(node.attributes[a].value.indexOf('objName') > -1) {
+					node.attributes[a].value = node.attributes[a].value.replace('objName', objName);
 				}
-				while(node.attributes[i].value.indexOf('objPathString') > -1) {
-					node.attributes[i].value = node.attributes[i].value.replace('objPathString', objPathString);
+				while(node.attributes[a].value.indexOf('objPathString') > -1) {
+					node.attributes[a].value = node.attributes[a].value.replace('objPathString', objPathString);
+				}
+				
+				if(node.attributes[a].name == 'persist' && node.id && node.id != 'length' /* <- failsafe */) {
+					var persists = node.attributes[a].value.split(' ');
+					this.overlays[i].persist[node.id] = {};
+					for(var p=0; p<persists.length; p++) {
+						this.overlays[i].persist[node.id][persists[p]] = true;
+					}
+					this.overlays[i].persist.length++;
 				}
 			}
 		}
@@ -543,8 +553,77 @@ this.overlayAid = {
 				continue;
 			}
 			
-			this.cleanXUL(curChild);
+			this.cleanXUL(curChild, i);
 			curChild = curChild.nextSibling;
+		}
+	},
+	
+	isPersist: function(overlay, id, attr) {
+		if(!id && !attr) {
+			return overlay.persist.length > 0;
+		}
+		
+		if(overlay.persist[id]) {
+			if(attr && !overlay.persist[id][attr]) {
+				return false;
+			}
+			return true;
+		}
+		return false;
+	},
+	
+	persistOverlay: function(document, overlay) {
+		if(!this.isPersist(overlay)) {
+			return;
+		}
+		
+		var allRes = {};
+		function showArcs(res, arcs) {
+			while(arcs.hasMoreElements()) {
+				var curArc = arcs.getNext().QueryInterface(Ci.nsIRDFResource);
+				var arcTargets = PlacesUIUtils.localStore.GetTargets(res, curArc, true);
+				while(arcTargets.hasMoreElements()) {
+					var curTarget = arcTargets.getNext();
+					try {
+						curTarget.QueryInterface(Ci.nsIRDFLiteral);
+						
+						var sources = res.Value.split('#');
+						if(!allRes[sources[0]]) { allRes[sources[0]] = {}; }
+						if(sources[1]) {
+							if(!allRes[sources[0]][sources[1]]) { allRes[sources[0]][sources[1]] = {}; }
+							allRes[sources[0]][sources[1]][curArc.Value] = curTarget.Value;
+						} else {
+							allRes[sources[0]][curArc.Value] = curTarget.Value;
+						}
+					}
+					catch(e) {
+						if(curTarget.Value) {
+							showArcs(curTarget, PlacesUIUtils.localStore.ArcLabelsOut(curTarget));
+						}
+					}
+				}
+			}
+		}
+		
+		var allResources = PlacesUIUtils.localStore.GetAllResources();
+		while(allResources.hasMoreElements()) {
+			var curResource = allResources.getNext().QueryInterface(Ci.nsIRDFResource);
+			showArcs(curResource, PlacesUIUtils.localStore.ArcLabelsOut(curResource));
+		}
+		
+		if(!allRes[document.baseURI]) { return; }
+		for(var id in allRes[document.baseURI]) {
+			if(this.isPersist(overlay, id)) {
+				for(var attr in allRes[document.baseURI][id]) {
+					if(this.isPersist(overlay, id, attr)) {
+						if(allRes[document.baseURI][id][attr] != '') {
+							document.getElementById(id).setAttribute(attr, allRes[document.baseURI][id][attr]);
+						} else {
+							document.getElementById(id).removeAttribute(attr);
+						}
+					}
+				}
+			}
 		}
 	},
 	
@@ -766,8 +845,8 @@ this.overlayAid = {
 							
 							var toolbars = window.document.querySelectorAll("toolbar");
 							toolbar_loop: for(var a=0; a<toolbars.length; a++) {
-								if(toolbars[a].getAttribute('currentset').indexOf(action.node.id) > -1) {
-									var currentset = toolbars[a].getAttribute('currentset').split(",");
+								var currentset = toolbars[a].getAttribute('currentset').split(",");
+								if(currentset.indexOf(action.node.id) > -1) {
 									for(var e=0; e<currentset.length; e++) {
 										if(currentset[e] == action.node.id) {
 											for(var l=e+1; l<currentset.length; l++) {
@@ -853,6 +932,8 @@ this.overlayAid = {
 				
 				// Resize the preferences dialogs to fit the content
 				this.sizeToContent(window);
+				
+				this.persistOverlay(window.document, this.overlays[i]);
 				
 				if(this.overlays[i].onload) {
 					this.overlays[i].onload(window);
@@ -1182,12 +1263,12 @@ this.overlayAid = {
 	appendButton: function(window, palette, node) {
 		this.closeCustomize();
 		
-		var node = palette.appendChild(node);
+		node = palette.appendChild(node);
 		
 		var toolbars = window.document.querySelectorAll("toolbar");
 		toolbar_loop: for(var a=0; a<toolbars.length; a++) {
-			if(toolbars[a].getAttribute('currentset').indexOf(node.id) > -1) {
-				var currentset = toolbars[a].getAttribute('currentset').split(",");
+			var currentset = toolbars[a].getAttribute('currentset').split(",");
+			if(currentset.indexOf(node.id) > -1) {
 				for(var e=0; e<currentset.length; e++) {
 					if(currentset[e] == node.id) {
 						for(var i=e+1; i<currentset.length; i++) {
