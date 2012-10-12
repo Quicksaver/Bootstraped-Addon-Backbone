@@ -19,22 +19,26 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.4',
+	version: '2.0.5',
 	modules: [],
 	moduleVars: {},
 	
 	loadIf: function(aModule, anIf, delayed) {
 		if(anIf) {
-			this.load(aModule, delayed);
+			return this.load(aModule, delayed);
 		} else {
-			this.unload(aModule);
+			return !this.unload(aModule);
 		}
 	},
 	
 	load: function(aModule, delayed) {
 		var path = this.preparePath(aModule);
-		if(!path || this.loaded(path) !== false) {
+		if(!path) {
 			return false;
+		}
+		
+		if(this.loaded(path) !== false) {
+			return true;
 		}
 		
 		try { Services.scriptloader.loadSubScript(path, self); }
