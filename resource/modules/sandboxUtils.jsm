@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.0.11';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'setWatchers', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
+moduleAid.VERSION = '1.0.12';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -1393,74 +1393,153 @@ this.aSync = function(aFunc, aDelay) {
 	return newTimer;
 };
 
-// setWatchers(obj, remove) - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
-//	obj - (xul element) to prepare the watchers on, every method is added to obj and acts upon it
-//		obj.addPropertyWatcher(prop, handler, capture) - registers handler as a watcher for obj property prop changes
-//			prop - (string) property name in obj to watch
-//			handler - (function) method to fire when prop is set or changed
-//			(optional) capture - when true it cancels setting the property if handler returns (bool) false, defaults to false
-//		obj.removePropertyWatcher(prop, handler, capture) - unregisters handler as a watcher for prop changes
-//			see obj.addPropertyWatcher()
-//		obj.addAttributeWatcher(attr, handler, capture) - registers handler as a watcher for object attribute attr changes
-//			attr - (string) attribute name of obj to watch
-//			handler - (function) method to fire when attr is set, removed or changed
-//			(optional) capture - when true it cancels setting the attribute if handler returns (bool) false, defaults to false
-//		obj.removeAttributeWatcher(attr, handler, capture) - unregisters handler as a watcher for object attribute attr changes
-//			see obj.addAttributeWatcher()
-//	(optional) remove - if true it removes all the methods introduced by setWatchers, defaults to false
+// objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
+//	addPropertyWatcher(obj, prop, handler, capture) - registers handler as a watcher for obj property prop changes
+//		obj - (xul element or object) to watch for changes
+//		prop - (string) property name in obj to watch
+//		handler - (function) method to fire when prop is set or changed
+//		(optional) capture - when (bool) true it cancels setting the property if handler returns (bool) false, defaults to (bool) false
+//	removePropertyWatcher(obj, prop, handler, capture) - unregisters handler as a watcher for prop changes
+//		see addPropertyWatcher()
+//	addAttributeWatcher(obj, attr, handler, capture) - registers handler as a watcher for object attribute attr changes
+//		obj - (xul element or object) to watch for changes
+//		attr - (string) attribute name in obj to watch
+//		handler - (function) method to fire when attr is set, removed or changed
+//		(optional) capture - when (bool) true it cancels setting the attribute if handler returns (bool) false, defaults to (bool) false
+//	removeAttributeWatcher(obj, attr, handler, capture) - unregisters handler as a watcher for object attribute attr changes
+//		see addAttributeWatcher()
 // All handlers expect function(prop, oldVal, newVal), where:
-//	prop - (string) name of the property or attribute being set
+//	prop - (string) name of the property or attribute being set or changed
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
-// Note: deleting a watched property does not trigger the watchers, so don't do it. Also setting the watchers on an unset property won't work either.
-// I can't do anything when setting attributes from within the .attributes element property.
-this.setWatchers = function(obj, remove) {
-	if(typeof(obj) != 'object' || obj === null) { return; }
-	
-	if(remove) {
-		if(!obj._propWatchers) { return; }
+// Note: deleting a watched property does not trigger the watchers, so don't do it! Also setting the watchers on an unset property won't work either.
+// I can't do anything when setting attributes from within the obj.attributes object.
+this.objectWatcher = {
+	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
+	addPropertyWatcher: function(obj, prop, handler, capture) {
+		if(typeof(obj[prop]) == 'undefined' || !this.setWatchers(obj)) { return false; }
+		capture = (capture) ? true : false;
 		
-		for(var i = 0; i < obj._propWatchers.setters.length; i++) {
-			if(obj._propWatchers.setters[i] == objName) { 
-				obj._propWatchers.setters.splice(i, 1);
-				break;
+		if(typeof(obj._propWatchers.properties[prop]) == 'undefined') {
+			var tempVal = obj[prop];
+			// can't watch constants
+			if(!(delete obj[prop])) {
+				this.unsetWatchers(obj);
+				return false;
+			}
+			
+			obj._propWatchers.properties[prop] = {
+				value: tempVal,
+				handlers: []
+			};
+			obj._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
+			
+			obj.__defineGetter__(prop, function () { return this._propWatchers.properties[prop].value; });
+			obj.__defineSetter__(prop, function (newVal) {
+				var oldVal = this._propWatchers.properties[prop].value;
+				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
+					if(this._propWatchers.properties[prop].handlers[i].capture) {
+						if(this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal) === false) {
+							return this._propWatchers.properties[prop].value;
+						}
+					}
+				}
+				this._propWatchers.properties[prop].value = newVal;
+				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
+					if(!this._propWatchers.properties[prop].handlers[i].capture) {
+						this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal);
+					}
+				}
+				return this._propWatchers.properties[prop].value;
+			});
+		}
+		else {
+			for(var i=0; i<obj._propWatchers.properties[prop].handlers.length; i++) {
+				if(compareFunction(obj._propWatchers.properties[prop].handlers[i].handler, handler)
+				&& capture == obj._propWatchers.properties[prop].handlers[i].capture) { return false; }
+			}
+			obj._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
+		}
+		
+		obj._propWatchers.setters++;
+		return true;
+	},
+	
+	removePropertyWatcher: function(obj, prop, handler, capture) {
+		if(!obj._propWatchers || typeof(obj._propWatchers.properties[prop]) == 'undefined') { return false; }
+		capture = (capture) ? true : false;
+		
+		for(var i=0; i<obj._propWatchers.properties[prop].handlers.length; i++) {
+			if(compareFunction(obj._propWatchers.properties[prop].handlers[i].handler, handler)
+			&& capture == obj._propWatchers.properties[prop].handlers[i].capture) {
+				obj._propWatchers.properties[prop].handlers.splice(i, 1);
+				if(obj._propWatchers.properties[prop].handlers.length == 0) {
+					delete obj[prop]; // remove accessors
+					obj[prop] = obj._propWatchers.properties[prop].value;
+					delete obj._propWatchers.properties[prop];
+				}
+				
+				obj._propWatchers.setters--;
+				this.unsetWatchers(obj);
+				return true;
 			}
 		}
-		if(obj._propWatchers.setters.length > 0) { return; }
 		
-		// remove accessors
-		for(var prop in obj._propWatchers.properties) {
-			delete obj[prop];
-			obj[prop] = obj._propWatchers.properties[prop].value;
-		}
-		delete obj.addPropertyWatcher;
-		delete obj.removePropertyWatcher;
-		
-		obj.setAttribute = obj._setAttribute;
-		obj.setAttributeNS = obj._setAttributeNS;
-		obj.setAttributeNode = obj._setAttributeNode;
-		obj.setAttributeNodeNS = obj._setAttributeNodeNS;
-		obj.removeAttribute = obj._removeAttribute;
-		obj.removeAttributeNS = obj._removeAttributeNS;
-		obj.removeAttributeNode = obj._removeAttributeNode;
-		delete obj._setAttribute;
-		delete obj._setAttributeNS;
-		delete obj._setAttributeNode;
-		delete obj._setAttributeNodeNS;
-		delete obj._removeAttribute;
-		delete obj._removeAttributeNS;
-		delete obj._removeAttributeNode;
-		delete obj.addAttributeWatcher;
-		delete obj.removeAttributeWatcher;
-		
-		delete obj._propWatchers;
-		
-		return;
-	}
+		return false;
+	},
 	
-	if(!obj._propWatchers) {
+	// Attributes part, works by replacing the actual attribute native functions with custom ones (while still using the native ones)
+	addAttributeWatcher: function(obj, attr, handler, capture) {
+		if(!this.setWatchers(obj)) { return false; }
+		capture = (capture) ? true : false;
+		
+		if(typeof(obj._propWatchers.attributes[attr]) == 'undefined') {
+			obj._propWatchers.attributes[attr] = {
+				value: (obj.hasAttribute(attr)) ? obj.getAttribute(attr) : null,
+				handlers: []
+			};
+			obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
+		}
+		else {
+			for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
+				if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
+				&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) { return false; }
+			}
+			obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
+		}
+		
+		obj._propWatchers.setters++;
+		return true;
+	},
+	
+	removeAttributeWatcher: function(obj, attr, handler, capture) {
+		if(!obj._propWatchers || typeof(obj._propWatchers.attributes[attr]) == 'undefined') { return false; }
+		capture = (capture) ? true : false;
+		
+		for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
+			if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
+			&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) {
+				obj._propWatchers.attributes[attr].handlers.splice(i, 1);
+				if(obj._propWatchers.attributes[attr].handlers.length == 0) {
+					delete obj._propWatchers.attributes[attr];
+				}
+				
+				obj._propWatchers.setters--;
+				this.unsetWatchers(obj);
+				return true;
+			}
+		}
+		
+		return false;
+	},
+	
+	setWatchers: function(obj) {
+		if(typeof(obj) != 'object' || obj === null) { return false; }
+		
+		if(obj._propWatchers) { return true; }
+		
 		obj._propWatchers = {
-			setters: [],
+			setters: 0,
 			properties: {},
 			attributes: {},
 			callAttrWatchers: function(attr, newVal, capture) {
@@ -1485,159 +1564,80 @@ this.setWatchers = function(obj, remove) {
 				return true;
 			}
 		};
+		
+		// Store all native functions as '_function' and set custom ones to handle attribute changes
+		obj._setAttribute = obj.setAttribute;
+		obj._setAttributeNS = obj.setAttributeNS;
+		obj._setAttributeNode = obj.setAttributeNode;
+		obj._setAttributeNodeNS = obj.setAttributeNodeNS;
+		obj._removeAttribute = obj.removeAttribute;
+		obj._removeAttributeNS = obj.removeAttributeNS;
+		obj._removeAttributeNode = obj.removeAttributeNode;
+		
+		obj.setAttribute = function setAttribute(attr, value) {
+			if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
+			this._setAttribute(attr, value);
+			this._propWatchers.callAttrWatchers(attr, value, false);
+		};
+		obj.setAttributeNS = function(namespace, attr, value) {
+			if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
+			this._setAttributeNS(namespace, attr, value);
+			this._propWatchers.callAttrWatchers(attr, value, false);
+		};
+		obj.setAttributeNode = function(attr) {
+			if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
+			var ret = this._setAttributeNode(attr);
+			this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
+			return ret;
+		};
+		obj.setAttributeNodeNS = function(attr) {
+			if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
+			var ret = this._setAttributeNodeNS(attr);
+			this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
+			return ret;
+		};
+		obj.removeAttribute = function removeAttribute(attr) {
+			if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
+			this._removeAttribute(attr);
+			this._propWatchers.callAttrWatchers(attr, null, false);
+		};
+		obj.removeAttributeNS = function(namespace, attr) {
+			if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
+			this._removeAttributeNS(namespace, attr);
+			this._propWatchers.callAttrWatchers(attr, null, false);
+		};
+		obj.removeAttributeNode = function(attr) {
+			if(!this._propWatchers.callAttrWatchers(attr.name, null, true)) { return null; }
+			var ret = this._removeAttributeNode(attr);
+			this._propWatchers.callAttrWatchers(attr.name, null, false);
+			return ret;
+		};
+		
+		return true;
+	},
+	
+	unsetWatchers: function(obj) {
+		if(typeof(obj) != 'object' || obj === null || !obj._propWatchers || obj._propWatchers.setters > 0) { return false; }
+		
+		obj.setAttribute = obj._setAttribute;
+		obj.setAttributeNS = obj._setAttributeNS;
+		obj.setAttributeNode = obj._setAttributeNode;
+		obj.setAttributeNodeNS = obj._setAttributeNodeNS;
+		obj.removeAttribute = obj._removeAttribute;
+		obj.removeAttributeNS = obj._removeAttributeNS;
+		obj.removeAttributeNode = obj._removeAttributeNode;
+		delete obj._setAttribute;
+		delete obj._setAttributeNS;
+		delete obj._setAttributeNode;
+		delete obj._setAttributeNodeNS;
+		delete obj._removeAttribute;
+		delete obj._removeAttributeNS;
+		delete obj._removeAttributeNode;
+		
+		delete obj._propWatchers;
+		
+		return true;
 	}
-	for(var i = 0; i < obj._propWatchers.setters.length; i++) {
-		if(obj._propWatchers.setters[i] == objName) { return; }
-	}
-	obj._propWatchers.setters.push(objName);
-	
-	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
-	obj.addPropertyWatcher = function(prop, handler, capture) {
-		if(typeof(this[prop]) == 'undefined') { return; }
-		capture = (capture) ? true : false;
-		
-		if(typeof(this._propWatchers.properties[prop]) == 'undefined') {
-			var tempVal = this[prop];
-			// can't watch constants
-			if(!(delete this[prop])) { return; }
-			
-			this._propWatchers.properties[prop] = {
-				value: tempVal,
-				handlers: []
-			};
-			this._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
-			
-			this.__defineGetter__(prop, function () { return this._propWatchers.properties[prop].value; });
-			this.__defineSetter__(prop, function (newVal) {
-				var oldVal = this._propWatchers.properties[prop].value;
-				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
-					if(this._propWatchers.properties[prop].handlers[i].capture) {
-						if(this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal) === false) {
-							return this._propWatchers.properties[prop].value;
-						}
-					}
-				}
-				this._propWatchers.properties[prop].value = newVal;
-				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
-					if(!this._propWatchers.properties[prop].handlers[i].capture) {
-						this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal);
-					}
-				}
-				return this._propWatchers.properties[prop].value;
-			});
-		}
-		else {
-			for(var i=0; i<this._propWatchers.properties[prop].handlers.length; i++) {
-				if(compareFunction(this._propWatchers.properties[prop].handlers[i].handler, handler)
-				&& capture == this._propWatchers.properties[prop].handlers[i].capture) { return; }
-			}
-			this._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
-		}
-	};
-	
-	obj.removePropertyWatcher = function(prop, handler, capture) {
-		if(typeof(this._propWatchers.properties[prop]) == 'undefined') { return; }
-		capture = (capture) ? true : false;
-		
-		for(var i=0; i<this._propWatchers.properties[prop].handlers.length; i++) {
-			if(compareFunction(this._propWatchers.properties[prop].handlers[i].handler, handler)
-			&& capture == this._propWatchers.properties[prop].handlers[i].capture) {
-				this._propWatchers.properties[prop].handlers.splice(i, 1);
-				break;
-			}
-		}
-		
-		if(this._propWatchers.properties[prop].handlers.length == 0) {
-			delete this[prop]; // remove accessors
-			this[prop] = this._propWatchers.properties[prop].value;
-			delete this._propWatchers.properties[prop];
-		}
-	};
-	
-	// Attributes part, works by replacing the actual attribute native functions with custom ones (while still using the native ones)
-	obj.addAttributeWatcher = function(attr, handler, capture) {
-		capture = (capture) ? true : false;
-		
-		if(typeof(this._propWatchers.attributes[attr]) == 'undefined') {
-			this._propWatchers.attributes[attr] = {
-				value: (this.hasAttribute(attr)) ? this.getAttribute(attr) : null,
-				handlers: []
-			};
-			this._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
-		}
-		else {
-			for(var i=0; i<this._propWatchers.attributes[attr].handlers.length; i++) {
-				if(compareFunction(this._propWatchers.attributes[attr].handlers[i].handler, handler)
-				&& capture == this._propWatchers.attributes[attr].handlers[i].capture) { return; }
-			}
-			this._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
-		}
-	};
-	
-	obj.removeAttributeWatcher = function (attr, handler, capture) {
-		if(typeof(this._propWatchers.attributes[attr]) == 'undefined') { return; }
-		capture = (capture) ? true : false;
-		
-		for(var i=0; i<this._propWatchers.attributes[attr].handlers.length; i++) {
-			if(compareFunction(this._propWatchers.attributes[attr].handlers[i].handler, handler)
-			&& capture == this._propWatchers.attributes[attr].handlers[i].capture) {
-				this._propWatchers.attributes[attr].handlers.splice(i, 1);
-				break;
-			}
-		}
-		
-		if(this._propWatchers.attributes[attr].handlers.length == 0) {
-			delete this._propWatchers.attributes[attr];
-		}
-	};
-	
-	// Store all native functions as '_function' and set custom ones to handle attribute changes
-	obj._setAttribute = obj.setAttribute;
-	obj._setAttributeNS = obj.setAttributeNS;
-	obj._setAttributeNode = obj.setAttributeNode;
-	obj._setAttributeNodeNS = obj.setAttributeNodeNS;
-	obj._removeAttribute = obj.removeAttribute;
-	obj._removeAttributeNS = obj.removeAttributeNS;
-	obj._removeAttributeNode = obj.removeAttributeNode;
-	
-	obj.setAttribute = function setAttribute(attr, value) {
-		if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
-		this._setAttribute(attr, value);
-		this._propWatchers.callAttrWatchers(attr, value, false);
-	};
-	obj.setAttributeNS = function(namespace, attr, value) {
-		if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
-		this._setAttributeNS(namespace, attr, value);
-		this._propWatchers.callAttrWatchers(attr, value, false);
-	};
-	obj.setAttributeNode = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
-		var ret = this._setAttributeNode(attr);
-		this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
-		return ret;
-	};
-	obj.setAttributeNodeNS = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
-		var ret = this._setAttributeNodeNS(attr);
-		this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
-		return ret;
-	};
-	obj.removeAttribute = function removeAttribute(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
-		this._removeAttribute(attr);
-		this._propWatchers.callAttrWatchers(attr, null, false);
-	};
-	obj.removeAttributeNS = function(namespace, attr) {
-		if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
-		this._removeAttributeNS(namespace, attr);
-		this._propWatchers.callAttrWatchers(attr, null, false);
-	};
-	obj.removeAttributeNode = function(attr) {
-		if(!this._propWatchers.callAttrWatchers(attr.name, null, true)) { return null; }
-		var ret = this._removeAttributeNode(attr);
-		this._propWatchers.callAttrWatchers(attr.name, null, false);
-		return ret;
-	};
 };
 
 // compareFunction(a, b, strict) - returns (bool) if a === b
