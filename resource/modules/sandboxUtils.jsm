@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.13';
+moduleAid.VERSION = '1.1.0';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -216,8 +216,8 @@ this.styleAid = {
 //	(optional) aURI - (string) when defined, checks the documentURI property against the aURI value and only executes aCallback when true, defaults to null
 //	(optional) beforeComplete - (bool) true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
 //	see callOnMostRecent()
-// callOnLoad(window, aCallback, aType, aURI) - calls aCallback when load event is fired on that window
-//	window - (xul object) window object to execute aCallback on
+// callOnLoad(aWindow, aCallback, aType, aURI) - calls aCallback when load event is fired on that window
+//	aWindow - (xul object) window object to execute aCallback on
 //	see callOnMostRecent() and callOnAll
 // register(aHandler, aTopic) - registers aHandler to be notified of every aTopic
 //	aHandler - (function) handler to be fired
@@ -257,13 +257,13 @@ this.windowMediator = {
 		}
 	},
 	
-	callOnLoad: function(window, aCallback, aType, aURI) {
-		listenOnce(window, "load", function(event, window) {
+	callOnLoad: function(aWindow, aCallback, aType, aURI) {
+		listenOnce(aWindow, "load", function(event, aWindow) {
 			if(unloaded) { return; }
 			
-			if((!aType || window.document.documentElement.getAttribute('windowtype') == aType)
-			&& (!aURI || window.document.documentURI == aURI)) {
-				aCallback(window);
+			if((!aType || aWindow.document.documentElement.getAttribute('windowtype') == aType)
+			&& (!aURI || aWindow.document.documentURI == aURI)) {
+				aCallback(aWindow);
 			}
 		});
 	},
@@ -462,26 +462,30 @@ this.privateBrowsingAid = {
 // Elements with a getchildrenof attribute will inherit all the children from the elements specified by the comma-separated list of element ids.
 // Every occurence of (string) objName and (string) objPathString in every attribute in the overlay will be properly replaced with this object's objName and objPathString.
 // I can also overlay other overlays provided they are loaded through the overlayAid object (either from this add-on or another implementing it).
-// overlayURI(aURI, aWith, beforeload, onload, onunload) - overlays aURI with aWith
+// overlayURI(aURI, aWith, beforeload, onload, onunload) - overlays aWith in all windows with aURI
 //	aURI - (string) uri to be overlayed
 //	aWith - (string) uri to overlay aURI, can be fileName found as chrome://objPathString/content/fileName.xul or already the full uri path
 //	(optional) beforeload ( function(window) ) is called before the window is overlayed, expects a (object) window argument
 //	(optional) onload - ( function(window) ) to be called when aURI is overlayed with aWith, expects a (object) window argument
 //	(optional) onunload - ( function(window) ) to be called when aWith is unloaded from aURI, expects a (object) window argument
-// unOverlayURI(aURI, aWith) - removes aWith overlay from aURI
+// removeOverlayURI(aURI, aWith) - removes aWith overlay from all windows with aURI
 //	see overlayURI()
-// loaded(aURI, aWith) - returns (int) with corresponding overlay index in overlays[] if overlay aWith has been loaded for aURI, returns (bool) false otherwise 
+// overlayWindow(aWindow, aWith, beforeload, onload, onunload) - overlays aWindow with aWith
+//	aWindow - (object) window object to be overlayed
 //	see overlayURI()
+// removeOverlayWindow(aWindow, aWith) - removes aWith overlay from aWindow
+//	see overlayWindow()
+// loadedURI(aURI, aWith) - returns (int) with corresponding overlay index in overlays[] if overlay aWith has been loaded for aURI, returns (bool) false otherwise 
+//	see overlayURI()
+// loadedWindow(aWindow, aWith) -	returns (int) with corresponding overlay index in aWindow._OVERLAYS_LOADED[] if overlay aWith has been loaded for aWindow,
+//					returns (bool) false otherwise 
+//	see overlayWindow()
 this.overlayAid = {
 	overlays: [],
 	
-	getPath: function(aPath) {
-		return (aPath.indexOf("chrome://") === 0) ? aPath : "chrome://"+objPathString+"/content/"+aPath+".xul";
-	},
-	
 	overlayURI: function(aURI, aWith, beforeload, onload, onunload) {
 		var path = this.getPath(aWith);
-		if(this.loaded(aURI, path) !== false) { return; }
+		if(this.loadedURI(aURI, path) !== false) { return; }
 		
 		var newOverlay = {
 			uri: aURI,
@@ -498,29 +502,99 @@ this.overlayAid = {
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
 				overlayAid.overlays[i].document = xmlhttp.responseXML;
-				overlayAid.cleanXUL(overlayAid.overlays[i].document, i);
-				windowMediator.callOnAll(overlayAid.scheduleWindow);
+				overlayAid.cleanXUL(overlayAid.overlays[i].document, this.overlays[i]);
+				windowMediator.callOnAll(overlayAid.scheduleAll);
 			}
 		});
 	},
 	
-	unOverlayURI: function(aURI, aWith) {
-		// I sometimes call unOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
+	removeOverlayURI: function(aURI, aWith) {
+		// I sometimes call removeOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
 		// This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
 		if(unloaded) { return; }
 		
 		var path = this.getPath(aWith);
-		var i = this.loaded(aURI, path);
+		var i = this.loadedURI(aURI, path);
 		if(i === false) { return; }
 		
 		this.overlays.splice(i, 1);
 		
-		windowMediator.callOnAll(function(window) {
-			overlayAid.scheduleUnWindow(window, path);
+		windowMediator.callOnAll(function(aWindow) {
+			overlayAid.scheduleUnOverlay(aWindow, path);
 		});
-	},	
+	},
 	
-	cleanXUL: function(node, i) {
+	overlayWindow: function(aWindow, aWith, beforeload, onload, onunload) {
+		var path = this.getPath(aWith);
+		if(this.loadedWindow(aWindow, path) !== false) { return; }
+		
+		var newOverlay = {
+			uri: path,
+			traceBack: [],
+			beforeload: beforeload || null,
+			onload: onload || null,
+			onunload: onunload || null,
+			document: null,
+			loaded: false,
+			remove: false,
+			persist: { length: 0 }
+		};
+		
+		if(aWindow._OVERLAYS_LOADED == undefined) {
+			aWindow._OVERLAYS_LOADED = [];
+		}
+		var i = aWindow._OVERLAYS_LOADED.push(newOverlay) -1;
+		
+		xmlHttpRequest(path, function(xmlhttp) {
+			if(xmlhttp.readyState === 4) {
+				aWindow._OVERLAYS_LOADED[i].document = xmlhttp.responseXML;
+				overlayAid.cleanXUL(aWindow._OVERLAYS_LOADED[i].document, aWindow._OVERLAYS_LOADED[i]);
+				overlayAid.scheduleAll(aWindow);
+			}
+		});
+	},
+	
+	removeOverlayWindow: function(aWindow, aWith) {
+		var path = this.getPath(aWith);
+		var i = this.loadedWindow(aWindow, path);
+		if(i === false) { return; }
+		
+		aWindow._OVERLAYS_LOADED[i].remove = true;
+		
+		// I sometimes call removeOverlayWindow() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the 
+		// overlays. This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
+		if(unloaded) { return; }
+		
+		overlayAid.scheduleUnOverlay(aWindow, path);
+	},
+	
+	loadedURI: function(aURI, aWith) {
+		var path = this.getPath(aWith);
+		for(var i = 0; i < this.overlays.length; i++) {
+			if(this.overlays[i].uri == aURI && this.overlays[i].overlay == path) {
+				return i;
+			}
+		}
+		return false;
+	},
+	
+	loadedWindow: function(aWindow, uri) {
+		if(aWindow._OVERLAYS_LOADED == undefined) {
+			return false;
+		}
+		for(var i = 0; i < aWindow._OVERLAYS_LOADED.length; i++) {
+			if(aWindow._OVERLAYS_LOADED[i].uri == uri) {
+				return i;
+			}
+		}
+		return false;
+	},
+	
+	getPath: function(aPath) {
+		return (aPath.indexOf("chrome://") === 0) ? aPath : "chrome://"+objPathString+"/content/"+aPath+".xul";
+	},
+	
+	cleanXUL: function(node, overlay) {
 		// Replace objName with this objName in every attribute
 		if(node.attributes) {
 			for(var a = 0; a < node.attributes.length; a++) {
@@ -533,11 +607,11 @@ this.overlayAid = {
 				
 				if(node.attributes[a].name == 'persist' && node.id && node.id != 'length' /* <- failsafe */) {
 					var persists = node.attributes[a].value.split(' ');
-					this.overlays[i].persist[node.id] = {};
+					overlay.persist[node.id] = {};
 					for(var p=0; p<persists.length; p++) {
-						this.overlays[i].persist[node.id][persists[p]] = true;
+						overlay.persist[node.id][persists[p]] = true;
 					}
-					this.overlays[i].persist.length++;
+					overlay.persist.length++;
 				}
 			}
 		}
@@ -553,7 +627,7 @@ this.overlayAid = {
 				continue;
 			}
 			
-			this.cleanXUL(curChild, i);
+			this.cleanXUL(curChild, overlay);
 			curChild = curChild.nextSibling;
 		}
 	},
@@ -627,93 +701,73 @@ this.overlayAid = {
 		}
 	},
 	
-	loaded: function(aURI, aWith) {
-		var path = this.getPath(aWith);
-		for(var i = 0; i < this.overlays.length; i++) {
-			if(this.overlays[i].uri == aURI && this.overlays[i].overlay == path) {
-				return i;
-			}
-		}
-		return false;
-	},
-	
-	scheduleWindow: function(window) {
+	scheduleAll: function(aWindow) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
 		if(unloaded) { return; }
 		
-		if(window.document.readyState != 'complete') {
-			windowMediator.callOnLoad(window, function() { 
-				aSync(function() { overlayAid.overlayWindow(window); });
+		if(aWindow.document.readyState != 'complete') {
+			windowMediator.callOnLoad(aWindow, function() { 
+				aSync(function() { overlayAid.overlayAll(aWindow); });
 			});
 		}
 		else {
 			aSync(function() {
 				// This still happens sometimes I have no idea why
 				if(typeof(overlayAid) == 'undefined') { return; }
-				overlayAid.overlayWindow(window);
+				overlayAid.overlayAll(aWindow);
 			});
 		}
 	},
 	
-	scheduleUnWindow: function(window, aWith) {
+	scheduleUnOverlay: function(aWindow, aWith) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
 		if(unloaded) { return; }
 		
-		aSync(function() { overlayAid.unOverlayWindow(window, aWith); });
+		aSync(function() { 
+			if(aWindow) { overlayAid.unOverlayWindow(aWindow, aWith); }
+		});
 	},
 	
-	unloadAll: function(window) {
-		if(window._OVERLAYS_LOADED) {
-			for(var o = window._OVERLAYS_LOADED.length -1; o >= 0; o--) {
+	unloadAll: function(aWindow) {
+		if(aWindow._OVERLAYS_LOADED) {
+			for(var o = aWindow._OVERLAYS_LOADED.length -1; o >= 0; o--) {
 				var isFromHere = false;
 				for(var i = 0; i < overlayAid.overlays.length; i++) {
-					if(window._OVERLAYS_LOADED[o].uri == overlayAid.overlays[i].uri) {
+					if(aWindow._OVERLAYS_LOADED[o].uri == overlayAid.overlays[i].uri) {
 						isFromHere = true;
 						break;
 					}
 				}
-				overlayAid.unOverlayWindow(window, window._OVERLAYS_LOADED[o].uri, true, isFromHere);
+				overlayAid.unOverlayWindow(aWindow, aWindow._OVERLAYS_LOADED[o].uri, true, isFromHere);
 			}
-			delete window._OVERLAYS_LOADED;
-			delete window._BEING_OVERLAYED;
+			delete aWindow._OVERLAYS_LOADED;
+			delete aWindow._BEING_OVERLAYED;
 		}
 	},
 	
-	windowHasOverlay: function(window, uri) {
-		if(window._OVERLAYS_LOADED == undefined) {
-			return false;
-		}
-		for(var i = 0; i < window._OVERLAYS_LOADED.length; i++) {
-			if(window._OVERLAYS_LOADED[i].uri == uri) {
-				return i;
-			}
-		}
-		return false;
-	},
-	
-	traceBack: function(window, traceback, unshift) {
+	traceBack: function(aWindow, traceback, unshift) {
 		if(!unshift) {
-			window._OVERLAYS_LOADED[window._BEING_OVERLAYED].traceBack.push(traceback);
+			aWindow._OVERLAYS_LOADED[aWindow._BEING_OVERLAYED].traceBack.push(traceback);
 		} else {
-			window._OVERLAYS_LOADED[window._BEING_OVERLAYED].traceBack.unshift(traceback);
+			aWindow._OVERLAYS_LOADED[aWindow._BEING_OVERLAYED].traceBack.unshift(traceback);
 		}
 	},
 	
-	updateOverlayedNodes: function(window, node, nodeList) {
+	updateOverlayedNodes: function(aWindow, node, nodeList) {
 		if(nodeList != undefined) {
 			for(var k = 0; k < nodeList.length; k++) {
-				window._OVERLAYS_LOADED[nodeList[k].i].traceBack[nodeList[k].j][nodeList[k].nodeField] = node;
+				aWindow._OVERLAYS_LOADED[nodeList[k].i].traceBack[nodeList[k].j][nodeList[k].nodeField] = node;
 			}
 			return true;
 		}
 		
 		nodeList = [];
-		for(var i = 0; i < window._OVERLAYS_LOADED.length; i++) {
-			for(var j = 0; j < window._OVERLAYS_LOADED[i].traceBack.length; j++) {
-				if(window._OVERLAYS_LOADED[i].traceBack[j].node && window._OVERLAYS_LOADED[i].traceBack[j].node == node) {
+		for(var i = 0; i < aWindow._OVERLAYS_LOADED.length; i++) {
+			for(var j = 0; j < aWindow._OVERLAYS_LOADED[i].traceBack.length; j++) {
+				if(aWindow._OVERLAYS_LOADED[i].traceBack[j].node && aWindow._OVERLAYS_LOADED[i].traceBack[j].node == node) {
 					nodeList.push({ i: i, j: j, nodeField: 'node' });
 				}
-				else if(window._OVERLAYS_LOADED[i].traceBack[j].originalParent && window._OVERLAYS_LOADED[i].traceBack[j].originalParent == node) {
+				else if(aWindow._OVERLAYS_LOADED[i].traceBack[j].originalParent && aWindow._OVERLAYS_LOADED[i].traceBack[j].originalParent == node) {
 					nodeList.push({ i: i, j: j, nodeField: 'originalParent' });
 				}
 			}
@@ -721,45 +775,45 @@ this.overlayAid = {
 		return nodeList;
 	},
 	
-	unOverlayWindow: function(window, aWith, dontSchedule, isFromHere) {
-		if(!dontSchedule && window._BEING_OVERLAYED) {
-			this.scheduleUnWindow(window, aWith);
+	unOverlayWindow: function(aWindow, aWith, dontSchedule, isFromHere) {
+		if(!dontSchedule && aWindow._BEING_OVERLAYED) {
+			this.scheduleUnOverlay(aWindow, aWith);
 			return;
 		}
-		window._BEING_OVERLAYED = true;
+		aWindow._BEING_OVERLAYED = true;
 		
 		if(!isFromHere) {
 			isFromHere = false;
 		}
 		
-		var i = this.windowHasOverlay(window, aWith);
+		var i = this.loadedWindow(aWindow, aWith);
 		if(i !== false) {
-			for(var j = window._OVERLAYS_LOADED.length -1; j > i; j--) {
-				this.removeOverlay(window, j, !isFromHere);
+			for(var j = aWindow._OVERLAYS_LOADED.length -1; j > i; j--) {
+				this.removeOverlay(aWindow, j, !isFromHere);
 			}
 			
-			this.removeOverlay(window, i);
+			this.removeOverlay(aWindow, i);
 			
-			if(window._OVERLAYS_LOADED.length == 0) {
-				delete window._OVERLAYS_LOADED;
+			if(aWindow._OVERLAYS_LOADED.length == 0) {
+				delete aWindow._OVERLAYS_LOADED;
 			}
 		}
 		
 		if(!dontSchedule) {
-			delete window._BEING_OVERLAYED;
+			delete aWindow._BEING_OVERLAYED;
 		}
 		return;
 	},
 	
-	removeOverlay: function(window, i, reschedule) {
-		if(window._OVERLAYS_LOADED[i].onunload) {
-			window._OVERLAYS_LOADED[i].onunload(window);
+	removeOverlay: function(aWindow, i, reschedule) {
+		if(aWindow._OVERLAYS_LOADED[i].onunload) {
+			aWindow._OVERLAYS_LOADED[i].onunload(aWindow);
 		}
 		
-		for(var j = window._OVERLAYS_LOADED[i].traceBack.length -1; j >= 0; j--) {
-			var action = window._OVERLAYS_LOADED[i].traceBack[j];
+		for(var j = aWindow._OVERLAYS_LOADED[i].traceBack.length -1; j >= 0; j--) {
+			var action = aWindow._OVERLAYS_LOADED[i].traceBack[j];
 			if(action.node) {
-				var updateList = this.updateOverlayedNodes(window, action.node);
+				var updateList = this.updateOverlayedNodes(aWindow, action.node);
 			}
 			
 			try {
@@ -830,7 +884,7 @@ this.overlayAid = {
 						break;
 					
 					case 'sizeToContent':
-						window.sizeToContent();
+						aWindow.sizeToContent();
 						break;
 					
 					case 'appendButton':
@@ -847,14 +901,14 @@ this.overlayAid = {
 						if(action.node && action.palette) {
 							action.node = action.palette.appendChild(action.node);
 							
-							var toolbars = window.document.querySelectorAll("toolbar");
+							var toolbars = aWindow.document.querySelectorAll("toolbar");
 							toolbar_loop: for(var a=0; a<toolbars.length; a++) {
 								var currentset = toolbars[a].getAttribute('currentset').split(",");
 								if(currentset.indexOf(action.node.id) > -1) {
 									for(var e=0; e<currentset.length; e++) {
 										if(currentset[e] == action.node.id) {
 											for(var l=e+1; l<currentset.length; l++) {
-												var beforeEl = window.document.getElementById(currentset[l]);
+												var beforeEl = aWindow.document.getElementById(currentset[l]);
 												if(beforeEl) {
 													toolbars[a].insertItem(action.node.id, beforeEl);
 													break toolbar_loop;
@@ -874,106 +928,119 @@ this.overlayAid = {
 			} catch(ex) {}
 			
 			if(action.node) {
-				this.updateOverlayedNodes(window, action.node, updateList);
+				this.updateOverlayedNodes(aWindow, action.node, updateList);
 			}
 		}
 		
-		this.startPreferences(window);
+		this.startPreferences(aWindow);
 		
-		if(reschedule) {
-			reschedule = window._OVERLAYS_LOADED[i].reschedule;
+		if(!aWindow._OVERLAYS_LOADED[i].document || aWindow._OVERLAYS_LOADED[i].remove) {
+			aWindow._OVERLAYS_LOADED.splice(i, 1);
+		} else if(aWindow._OVERLAYS_LOADED[i].document) {
+			aWindow._OVERLAYS_LOADED[i].loaded = false;
 		}
-		window._OVERLAYS_LOADED.splice(i, 1);
 		if(reschedule) {
-			reschedule();
+			this.scheduleAll(aWindow);
 		}
 	},
 	
-	overlayWindow: function(window) {
-		if(window._BEING_OVERLAYED) {
-			this.scheduleWindow(window);
+	overlayAll: function(aWindow) {
+		if(aWindow._BEING_OVERLAYED) {
+			this.scheduleAll(aWindow);
 			return;
 		}
-		window._BEING_OVERLAYED = true;
+		aWindow._BEING_OVERLAYED = true;
 		var rescheduleOverlay = false;
 		
-		for(var i = 0; i < this.overlays.length; i++) {
+		if(aWindow._OVERLAYS_LOADED == undefined) {
+			aWindow._OVERLAYS_LOADED = [];
+		}
+		
+		for(var i=0; i<aWindow._OVERLAYS_LOADED.length; i++) {
+			if(aWindow._OVERLAYS_LOADED[i].document && !aWindow._OVERLAYS_LOADED[i].loaded) {
+				aWindow._BEING_OVERLAYED = i;
+				this.overlayDocument(aWindow, aWindow._OVERLAYS_LOADED[i]);
+				aWindow._OVERLAYS_LOADED[i].loaded = true;
+			}
+		}
+		
+		for(var i=0; i<this.overlays.length; i++) {
 			if(this.overlays[i].document
-			&& (this.overlays[i].uri == window.document.baseURI || this.windowHasOverlay(window, this.overlays[i].uri) !== false)
-			&& this.windowHasOverlay(window, this.overlays[i].overlay) === false) {
-				if(window._OVERLAYS_LOADED == undefined) {
-					window._OVERLAYS_LOADED = [];
-				}
-				window._BEING_OVERLAYED = window._OVERLAYS_LOADED.push({
+			&& (this.overlays[i].uri == aWindow.document.baseURI || this.loadedWindow(aWindow, this.overlays[i].uri) !== false)
+			&& this.loadedWindow(aWindow, this.overlays[i].overlay) === false) {
+				aWindow._BEING_OVERLAYED = aWindow._OVERLAYS_LOADED.push({
 					uri: this.overlays[i].overlay,
 					traceBack: [],
-					onunload: this.overlays[i].onunload,
-					reschedule: function() {
-						overlayAid.scheduleWindow(window);
-					}
+					onunload: this.overlays[i].onunload
 				}) -1;
 				
-				if(this.overlays[i].beforeload) {
-					this.overlays[i].beforeload(window);
-				}
-				
-				for(var o = 0; o < this.overlays[i].document.childNodes.length; o++) {
-					if(this.overlays[i].document.childNodes[o].nodeName == 'window') {
-						continue;
-					}
-					
-					if(this.overlays[i].document.childNodes[o].nodeName == 'overlay') {
-						this.loadInto(window, this.overlays[i].document.childNodes[o]);
-					}
-					
-					else if(this.overlays[i].document.childNodes[o].nodeName == 'xml-stylesheet') {
-						this.appendXMLSS(window, this.overlays[i].document.childNodes[o]);
-					}
-				}
-				
-				// Have to set the correct values into modified preferences
-				this.startPreferences(window);
-				
-				// Resize the preferences dialogs to fit the content
-				this.sizeToContent(window);
-				
-				this.persistOverlay(window.document, this.overlays[i]);
-				
-				if(this.overlays[i].onload) {
-					this.overlays[i].onload(window);
-				}
-				
+				this.overlayDocument(aWindow, this.overlays[i]);
 				rescheduleOverlay = true;
 			}
 		}
 		
-		delete window._BEING_OVERLAYED;
+		if(aWindow._OVERLAYS_LOADED.length == 0) {
+			delete aWindow._OVERLAYS_LOADED;
+		}
+		delete aWindow._BEING_OVERLAYED;
 		
 		// Re-schedule overlaying the window to load overlays over newly loaded overlays if necessary
 		if(rescheduleOverlay) {
-			this.scheduleWindow(window);
+			this.scheduleAll(aWindow);
 		}
 		
 		return;
 	},
 	
-	loadInto: function(window, overlay) {
+	overlayDocument: function(aWindow, overlay) {
+		if(overlay.beforeload) {
+			overlay.beforeload(aWindow);
+		}
+		
+		for(var o = 0; o < overlay.document.childNodes.length; o++) {
+			if(overlay.document.childNodes[o].nodeName == 'window') {
+				continue;
+			}
+			
+			if(overlay.document.childNodes[o].nodeName == 'overlay') {
+				this.loadInto(aWindow, overlay.document.childNodes[o]);
+			}
+			
+			else if(overlay.document.childNodes[o].nodeName == 'xml-stylesheet') {
+				this.appendXMLSS(aWindow, overlay.document.childNodes[o]);
+			}
+		}
+		
+		// Have to set the correct values into modified preferences
+		this.startPreferences(aWindow);
+		
+		// Resize the preferences dialogs to fit the content
+		this.sizeToContent(aWindow);
+		
+		this.persistOverlay(aWindow.document, overlay);
+		
+		if(overlay.onload) {
+			overlay.onload(aWindow);
+		}
+	},
+	
+	loadInto: function(aWindow, overlay) {
 		for(var i = 0; i < overlay.childNodes.length; i++) {
 			var overlayNode = overlay.childNodes[i];
 			
 			// Special case for overlaying preferences to options dialogs
 			if(overlayNode.nodeName == 'preferences') {
-				this.addPreferences(window, overlay.childNodes[i]);
+				this.addPreferences(aWindow, overlay.childNodes[i]);
 				continue;
 			}
 			
 			// Overlaying script elements when direct children of the overlay element
-			// With src attribute we import it as a subscript of window, otherwise we eval the inline content of the script tag
+			// With src attribute we import it as a subscript of aWindow, otherwise we eval the inline content of the script tag
 			if(overlayNode.nodeName == 'script' && overlay.nodeName == 'overlay') {
 				if(overlayNode.hasAttribute('src')) {
-					Services.scriptloader.loadSubScript(overlayNode.getAttribute('src'), window);
+					Services.scriptloader.loadSubScript(overlayNode.getAttribute('src'), aWindow);
 				} else {
-					window.eval(overlayNode.textContent);
+					aWindow.eval(overlayNode.textContent);
 				}
 				continue;
 			}
@@ -983,17 +1050,17 @@ this.overlayAid = {
 			
 			// Correctly add or remove toolbar buttons to the toolbox palette
 			if(overlayNode.nodeName == 'toolbarpalette') {
-				var toolbox = window.document.querySelectorAll('toolbox');
+				var toolbox = aWindow.document.querySelectorAll('toolbox');
 				for(var a=0; a<toolbox.length; a++) {
 					if(toolbox[a].palette && toolbox[a].palette.id == overlayNode.id) {
 						buttons_loop: for(var e=0; e<overlayNode.childNodes.length; e++) {
-							var button = window.document.importNode(overlayNode.childNodes[e]);
+							var button = aWindow.document.importNode(overlayNode.childNodes[e]);
 							if(button.id) {
 								// change or remove the button on the toolbar if it is found in the document
-								var existButton = window.document.getElementById(button.id);
+								var existButton = aWindow.document.getElementById(button.id);
 								if(existButton) {
 									if(button.getAttribute('removeelement') == 'true') {
-										this.removeButton(window, toolbox[a].palette, existButton);
+										this.removeButton(aWindow, toolbox[a].palette, existButton);
 										continue buttons_loop;
 									}
 									
@@ -1001,7 +1068,7 @@ this.overlayAid = {
 										// Why bother, id is the same already
 										if(button.attributes[c].name == 'id') { continue; }
 										
-										this.setAttribute(window, existButton, button.attributes[c]);
+										this.setAttribute(aWindow, existButton, button.attributes[c]);
 									}
 									continue buttons_loop;
 								}
@@ -1010,7 +1077,7 @@ this.overlayAid = {
 								for(var b=0; b<toolbox[a].palette.childNodes.length; b++) {
 									if(toolbox[a].palette.childNodes[b].id == button.id) {
 										if(button.getAttribute('removeelement') == 'true') {
-											this.removeButton(window, toolbox[a].palette, toolbox[a].palette.childNodes[b]);
+											this.removeButton(aWindow, toolbox[a].palette, toolbox[a].palette.childNodes[b]);
 											continue buttons_loop;
 										}
 										
@@ -1018,14 +1085,14 @@ this.overlayAid = {
 											// Why bother, id is the same already
 											if(button.attributes[c].name == 'id') { continue; }
 											
-											this.setAttribute(window, toolbox[a].palette.childNodes[b], button.attributes[c]);
+											this.setAttribute(aWindow, toolbox[a].palette.childNodes[b], button.attributes[c]);
 										}
 										continue buttons_loop;
 									}
 								}
 								
 								// add the button if not found either in a toolbar or the palette
-								this.appendButton(window, toolbox[a].palette, button);
+								this.appendButton(aWindow, toolbox[a].palette, button);
 							}
 						}
 						break;
@@ -1034,7 +1101,7 @@ this.overlayAid = {
 				continue;
 			}
 			
-			var node = window.document.getElementById(overlayNode.id);
+			var node = aWindow.document.getElementById(overlayNode.id);
 			// Handle if node with same id was found
 			
 			if(node) {
@@ -1043,7 +1110,7 @@ this.overlayAid = {
 				
 				// If removeelement attribute is true, remove the element and do nothing else
 				if(overlayNode.getAttribute('removeelement') == 'true') {
-					this.removeChild(window, node);
+					this.removeChild(aWindow, node);
 					continue;
 				}
 				
@@ -1052,37 +1119,37 @@ this.overlayAid = {
 					// Why bother, id is the same already
 					if(overlayNode.attributes[a].name == 'id') { continue; }
 					
-					this.setAttribute(window, node, overlayNode.attributes[a]);
+					this.setAttribute(aWindow, node, overlayNode.attributes[a]);
 				}
 				
 				// Move the node around if necessary
-				node = this.moveAround(window, node, overlayNode, node.parentNode);
+				node = this.moveAround(aWindow, node, overlayNode, node.parentNode);
 				
 				// Get Children of an Element's ID into this node
-				this.getChildrenOf(window, node);
+				this.getChildrenOf(aWindow, node);
 				
 				// Load children of the overlayed node
-				this.loadInto(window, overlay.childNodes[i]);
+				this.loadInto(aWindow, overlay.childNodes[i]);
 			}
 			else if(overlayNode.parentNode.nodeName != 'overlay') {
-				var node = window.document.importNode(overlayNode);
+				var node = aWindow.document.importNode(overlayNode);
 				
 				// Add the node to the correct place
-				node = this.moveAround(window, node, overlayNode, window.document.getElementById(overlayNode.parentNode.id));
+				node = this.moveAround(aWindow, node, overlayNode, aWindow.document.getElementById(overlayNode.parentNode.id));
 				
 				// Get Children of an Element's ID into this node
-				this.getChildrenOf(window, node);
+				this.getChildrenOf(aWindow, node);
 				
 				// Surf through all the children of node for the getchildrenof attribute
 				var allGetChildrenOf = node.getElementsByAttribute('getchildrenof', '*');
 				for(var gco = 0; gco < allGetChildrenOf.length; gco++) {
-					this.getChildrenOf(window, allGetChildrenOf[gco]);
+					this.getChildrenOf(aWindow, allGetChildrenOf[gco]);
 				}
 			}
 		}
 	},
 	
-	moveAround: function(window, node, overlayNode, parent) {
+	moveAround: function(aWindow, node, overlayNode, parent) {
 		if(overlayNode.getAttribute('insertafter')) {
 			var idList = overlayNode.getAttribute('insertafter').split(',');
 			for(var i = 0; i < idList.length; i++) {
@@ -1092,7 +1159,7 @@ this.overlayAid = {
 				
 				for(var c = 0; c < parent.childNodes.length; c++) {
 					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(window, node, parent, parent.childNodes[c].nextSibling);
+						return this.insertBefore(aWindow, node, parent, parent.childNodes[c].nextSibling);
 					}
 				}
 			}
@@ -1107,7 +1174,7 @@ this.overlayAid = {
 				
 				for(var c = 0; c < parent.childNodes.length; c++) {
 					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(window, node, parent, parent.childNodes[c]);
+						return this.insertBefore(aWindow, node, parent, parent.childNodes[c]);
 					}
 				}
 			}
@@ -1116,22 +1183,22 @@ this.overlayAid = {
 		if(overlayNode.getAttribute('position')) {
 			var position = parseInt(overlayNode.getAttribute('position')) -1; // one-based children list
 			var sibling = (sibling < parent.childNodes.length) ? node.parentNode.childNodes[position] : null;
-			return this.insertBefore(window, node, parent, sibling);
+			return this.insertBefore(aWindow, node, parent, sibling);
 		}
 		
 		if(!node.parentNode) {
-			return this.appendChild(window, node, parent);
+			return this.appendChild(aWindow, node, parent);
 		}
 		return node;
 	},
 	
-	getChildrenOf: function(window, node) {
+	getChildrenOf: function(aWindow, node) {
 		var getID = node.getAttribute('getchildrenof');
 		if(!getID) { return; }
 		
 		getID = getID.split(',');
 		for(var i = 0; i < getID.length; i++) {
-			var getNode = window.document.getElementById(trim(getID[i]));
+			var getNode = aWindow.document.getElementById(trim(getID[i]));
 			if(!getNode) { continue; }
 			
 			var curChild = 0;
@@ -1141,23 +1208,23 @@ this.overlayAid = {
 					continue;
 				}
 				
-				this.appendChild(window, getNode.childNodes[curChild], node);
+				this.appendChild(aWindow, getNode.childNodes[curChild], node);
 			}
 		}
 	},
 	
-	appendChild: function(window, node, parent) {
+	appendChild: function(aWindow, node, parent) {
 		var originalParent = node.parentNode;
-		var updateList = this.updateOverlayedNodes(window, node);
+		var updateList = this.updateOverlayedNodes(aWindow, node);
 		
 		try { node = parent.appendChild(node); } catch(ex) { node = null; }
 		
-		this.updateOverlayedNodes(window, node, updateList);
-		this.traceBack(window, { action: 'appendChild', node: node, originalParent: originalParent });
+		this.updateOverlayedNodes(aWindow, node, updateList);
+		this.traceBack(aWindow, { action: 'appendChild', node: node, originalParent: originalParent });
 		return node;
 	},
 	
-	insertBefore: function(window, node, parent, sibling) {
+	insertBefore: function(aWindow, node, parent, sibling) {
 		var originalParent = node.parentNode;
 		
 		if(originalParent) {
@@ -1167,22 +1234,22 @@ this.overlayAid = {
 				}
 			}
 		}
-		var updateList = this.updateOverlayedNodes(window, node);
+		var updateList = this.updateOverlayedNodes(aWindow, node);
 		
 		try { node = parent.insertBefore(node, sibling); } catch(ex) { node = null; }
 		
-		this.updateOverlayedNodes(window, node, updateList);
+		this.updateOverlayedNodes(aWindow, node, updateList);
 		if(!originalParent) {
-			this.traceBack(window, { action: 'appendChild', node: node });
+			this.traceBack(aWindow, { action: 'appendChild', node: node });
 		} else {
-			this.traceBack(window, { action: 'insertBefore', node: node, originalParent: originalParent, originalPos: o });
+			this.traceBack(aWindow, { action: 'insertBefore', node: node, originalParent: originalParent, originalPos: o });
 		}
 		
 		return node;
 	},
 	
-	removeChild: function(window, node) {
-		var updateList = this.updateOverlayedNodes(window, node);
+	removeChild: function(aWindow, node) {
+		var updateList = this.updateOverlayedNodes(aWindow, node);
 		var originalParent = node.parentNode;
 		
 		var o = 0;
@@ -1196,42 +1263,42 @@ this.overlayAid = {
 		
 		try { node = node.parentNode.removeChild(node); } catch(ex) { node = null; }
 		
-		this.updateOverlayedNodes(window, node, updateList);
-		this.traceBack(window, { action: 'removeChild', node: node, originalParent: originalParent, originalPos: o });
+		this.updateOverlayedNodes(aWindow, node, updateList);
+		this.traceBack(aWindow, { action: 'removeChild', node: node, originalParent: originalParent, originalPos: o });
 		return node;
 	},
 	
-	setAttribute: function(window, node, attr) {
+	setAttribute: function(aWindow, node, attr) {
 		if(node.hasAttribute(attr.name)) {
-			this.traceBack(window, { action: 'modifyAttribute', node: node, name: attr.name, value: node.getAttribute(attr.name) });
+			this.traceBack(aWindow, { action: 'modifyAttribute', node: node, name: attr.name, value: node.getAttribute(attr.name) });
 		} else {
-			this.traceBack(window, { action: 'addAttribute', node: node, name: attr.name });
+			this.traceBack(aWindow, { action: 'addAttribute', node: node, name: attr.name });
 		}
 		
 		try { node.setAttribute(attr.name, attr.value); } catch(ex) {}
 	},
 	
-	appendXMLSS: function(window, node) {
+	appendXMLSS: function(aWindow, node) {
 		try { 
-			node = window.document.importNode(node);
+			node = aWindow.document.importNode(node);
 			// these have to come before the actual window element, here's hoping it's always the last one
-			node = window.document.insertBefore(node, window.document.lastChild);
+			node = aWindow.document.insertBefore(node, aWindow.document.lastChild);
 		} catch(ex) { node = null; }
-		this.traceBack(window, { action: 'appendXMLSS', node: node });
+		this.traceBack(aWindow, { action: 'appendXMLSS', node: node });
 		return node;
 	},
 	
-	addPreferences: function(window, node) {
-		var prefPane = window.document.getElementById(node.parentNode.id);
+	addPreferences: function(aWindow, node) {
+		var prefPane = aWindow.document.getElementById(node.parentNode.id);
 		if(!prefPane) { return; }
 		
 		var prefElements = prefPane.getElementsByTagName('preferences');
 		if(prefElements.length == 0) {
 			try {
-				var prefs = window.document.importNode(node);
+				var prefs = aWindow.document.importNode(node);
 				prefs = prefPane.appendChild(prefs);
 			} catch(ex) { prefs = null; }
-			this.traceBack(window, { action: 'addPreferencesElement', prefs: prefs });
+			this.traceBack(aWindow, { action: 'addPreferencesElement', prefs: prefs });
 			return;
 		}
 		
@@ -1240,15 +1307,15 @@ this.overlayAid = {
 			if(!node.childNodes[p].id) { continue; }
 			
 			try {
-				var pref = window.document.importNode(node.childNodes[p]);
+				var pref = aWindow.document.importNode(node.childNodes[p]);
 				pref = prefs.appendChild(pref);
 			} catch(ex) { pref = null; }
-			this.traceBack(window, { action: 'addPreference', pref: pref });
+			this.traceBack(aWindow, { action: 'addPreference', pref: pref });
 		}
 	},
 	
-	startPreferences: function(window) {
-		var prefs = window.document.getElementsByTagName('preference');
+	startPreferences: function(aWindow) {
+		var prefs = aWindow.document.getElementsByTagName('preference');
 		for(var i = 0; i < prefs.length; i++) {
 			// Overlayed preferences have a null value, like they haven't been initialized for some reason, this takes care of that
 			if(prefs[i].value === null) {
@@ -1258,27 +1325,27 @@ this.overlayAid = {
 		}
 	},
 	
-	sizeToContent: function(window) {
-		var isPrefDialog = window.document.getElementsByTagName('prefwindow');
-		if(isPrefDialog.length > 0 && isPrefDialog[0].parentNode == window.document) {
-			try { window.sizeToContent(); } catch(ex) {}
-			this.traceBack(window, { action: 'sizeToContent' }, true);
+	sizeToContent: function(aWindow) {
+		var isPrefDialog = aWindow.document.getElementsByTagName('prefwindow');
+		if(isPrefDialog.length > 0 && isPrefDialog[0].parentNode == aWindow.document) {
+			try { aWindow.sizeToContent(); } catch(ex) {}
+			this.traceBack(aWindow, { action: 'sizeToContent' }, true);
 		}
 	},
 	
-	appendButton: function(window, palette, node) {
+	appendButton: function(aWindow, palette, node) {
 		this.closeCustomize();
 		
 		node = palette.appendChild(node);
 		
-		var toolbars = window.document.querySelectorAll("toolbar");
+		var toolbars = aWindow.document.querySelectorAll("toolbar");
 		toolbar_loop: for(var a=0; a<toolbars.length; a++) {
 			var currentset = toolbars[a].getAttribute('currentset').split(",");
 			if(currentset.indexOf(node.id) > -1) {
 				for(var e=0; e<currentset.length; e++) {
 					if(currentset[e] == node.id) {
 						for(var i=e+1; i<currentset.length; i++) {
-							var beforeEl = window.document.getElementById(currentset[i]);
+							var beforeEl = aWindow.document.getElementById(currentset[i]);
 							if(beforeEl) {
 								toolbars[a].insertItem(node.id, beforeEl);
 								break toolbar_loop;
@@ -1291,19 +1358,19 @@ this.overlayAid = {
 			}
 		}
 		
-		this.traceBack(window, { action: 'appendButton', node: node });
+		this.traceBack(aWindow, { action: 'appendButton', node: node });
 		return node;
 	},
 	
-	removeButton: function(window, palette, node) {
+	removeButton: function(aWindow, palette, node) {
 		this.closeCustomize();
 		
 		node = node.parentNode.removeChild(node);
-		this.traceBack(window, { action: 'removeButton', node: node, palette: palette });
+		this.traceBack(aWindow, { action: 'removeButton', node: node, palette: palette });
 	},
 	
 	closeCustomize: function() {
-		windowMediator.callOnAll(function(window) { window.close(); }, null, "chrome://global/content/customizeToolbar.xul");
+		windowMediator.callOnAll(function(aWindow) { aWindow.close(); }, null, "chrome://global/content/customizeToolbar.xul");
 	}
 };
 
@@ -1707,7 +1774,7 @@ moduleAid.LOADMODULE = function() {
 	// This is so the observers aren't called twice on quitting sometimes
 	observerAid.add(function() { observerAid.hasQuit = true; }, 'quit-application');
 	Services.ww.registerNotification(windowMediator.callWatchers);
-	windowMediator.register(overlayAid.scheduleWindow, 'domwindowopened');
+	windowMediator.register(overlayAid.scheduleAll, 'domwindowopened');
 };
 
 moduleAid.UNLOADMODULE = function() {
