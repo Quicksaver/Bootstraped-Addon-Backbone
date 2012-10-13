@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.0';
+moduleAid.VERSION = '1.1.1';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -613,6 +613,15 @@ this.overlayAid = {
 					}
 					overlay.persist.length++;
 				}
+			}
+		}
+		
+		if(node.nodeName == 'xml-stylesheet') {
+			while(node.textContent.indexOf('objName') > -1) {
+				node.textContent = node.textContent.replace('objName', objName);
+			}
+			while(node.textContent.indexOf('objPathString') > -1) {
+				node.textContent = node.textContent.replace('objPathString', objPathString);
 			}
 		}
 		
@@ -1279,10 +1288,10 @@ this.overlayAid = {
 	},
 	
 	appendXMLSS: function(aWindow, node) {
-		try { 
+		try {
 			node = aWindow.document.importNode(node);
-			// these have to come before the actual window element, here's hoping it's always the last one
-			node = aWindow.document.insertBefore(node, aWindow.document.lastChild);
+			// these have to come before the actual window element
+			node = aWindow.document.insertBefore(node, aWindow.document.documentElement);
 		} catch(ex) { node = null; }
 		this.traceBack(aWindow, { action: 'appendXMLSS', node: node });
 		return node;
