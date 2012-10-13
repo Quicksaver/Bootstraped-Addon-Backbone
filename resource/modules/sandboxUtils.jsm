@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.12';
+moduleAid.VERSION = '1.0.13';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -647,7 +647,11 @@ this.overlayAid = {
 			});
 		}
 		else {
-			aSync(function() { overlayAid.overlayWindow(window); });
+			aSync(function() {
+				// This still happens sometimes I have no idea why
+				if(typeof(overlayAid) == 'undefined') { return; }
+				overlayAid.overlayWindow(window);
+			});
 		}
 	},
 	
@@ -776,8 +780,8 @@ this.overlayAid = {
 						break;
 						
 					case 'insertBefore':
-						if(action.node && action.node.parentNode && action.originalPos < action.node.parentNode.childNodes.length) {
-							action.node = action.node.parentNode.insertBefore(action.node, action.node.parentNode.childNodes[action.originalPos]);
+						if(action.node && action.originalParent && action.originalPos < action.node.parentNode.childNodes.length) {
+							action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
 						}
 						break;
 					
@@ -1086,9 +1090,9 @@ this.overlayAid = {
 				if(id == '') { continue; }
 				if(id == node.id) { continue; } // this is just stupid of course...
 				
-				for(var c = 0; c < parent.childNodes; c++) {
+				for(var c = 0; c < parent.childNodes.length; c++) {
 					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(window, node, parent.childNodes[c].nextSibling);
+						return this.insertBefore(window, node, parent, parent.childNodes[c].nextSibling);
 					}
 				}
 			}
@@ -1101,9 +1105,9 @@ this.overlayAid = {
 				if(id == '') { continue; }
 				if(id == node.id) { continue; } // this is just stupid of course...
 				
-				for(var c = 0; c < parent.childNodes; c++) {
+				for(var c = 0; c < parent.childNodes.length; c++) {
 					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(window, node, parent.childNodes[c]);
+						return this.insertBefore(window, node, parent, parent.childNodes[c]);
 					}
 				}
 			}
@@ -1112,7 +1116,7 @@ this.overlayAid = {
 		if(overlayNode.getAttribute('position')) {
 			var position = parseInt(overlayNode.getAttribute('position')) -1; // one-based children list
 			var sibling = (sibling < parent.childNodes.length) ? node.parentNode.childNodes[position] : null;
-			return this.insertBefore(window, node, sibling);
+			return this.insertBefore(window, node, parent, sibling);
 		}
 		
 		if(!node.parentNode) {
@@ -1153,23 +1157,25 @@ this.overlayAid = {
 		return node;
 	},
 	
-	insertBefore: function(window, node, sibling) {
-		if(node.parentNode) {
-			for(var o = 0; o < node.parentNode.childNodes.length; o++) {
-				if(node.parentNode.childNodes[o] == node) {
+	insertBefore: function(window, node, parent, sibling) {
+		var originalParent = node.parentNode;
+		
+		if(originalParent) {
+			for(var o = 0; o < originalParent.childNodes.length; o++) {
+				if(originalParent.childNodes[o] == node) {
 					break;
 				}
 			}
 		}
 		var updateList = this.updateOverlayedNodes(window, node);
 		
-		try { node = node.parentNode.insertBefore(node, sibling); } catch(ex) { node = null; }
+		try { node = parent.insertBefore(node, sibling); } catch(ex) { node = null; }
 		
 		this.updateOverlayedNodes(window, node, updateList);
-		if(!node.parentNode) {
+		if(!originalParent) {
 			this.traceBack(window, { action: 'appendChild', node: node });
 		} else {
-			this.traceBack(window, { action: 'insertBefore', node: node, originalPos: o });
+			this.traceBack(window, { action: 'insertBefore', node: node, originalParent: originalParent, originalPos: o });
 		}
 		
 		return node;
@@ -1274,11 +1280,11 @@ this.overlayAid = {
 						for(var i=e+1; i<currentset.length; i++) {
 							var beforeEl = window.document.getElementById(currentset[i]);
 							if(beforeEl) {
-								toolbars[a].insertItem('omnisidebar_button', beforeEl);
+								toolbars[a].insertItem(node.id, beforeEl);
 								break toolbar_loop;
 							}
 						}
-						toolbars[a].insertItem('omnisidebar_button', null, null, false);
+						toolbars[a].insertItem(node.id, null, null, false);
 						break toolbar_loop;
 					}
 				}
