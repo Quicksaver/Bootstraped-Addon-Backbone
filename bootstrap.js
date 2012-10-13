@@ -20,7 +20,7 @@
 //	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
 
-let bootstrapVersion = '1.0.4';
+let bootstrapVersion = '1.0.5';
 let unloaded = false;
 let started = false;
 let addonData = null;
@@ -29,6 +29,7 @@ const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/AddonManager.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
+Cu.import("resource://gre/modules/PlacesUIUtils.jsm");
 XPCOMUtils.defineLazyServiceGetter(Services, "fuel", "@mozilla.org/fuel/application;1", "fuelIApplication");
 XPCOMUtils.defineLazyServiceGetter(Services, "privateBrowsing", "@mozilla.org/privatebrowsing;1", "nsIPrivateBrowsingService");
 XPCOMUtils.defineLazyServiceGetter(Services, "stylesheet", "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");

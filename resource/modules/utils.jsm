@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.2';
+moduleAid.VERSION = '1.1.3';
 moduleAid.VARSLIST = ['modifyFunction', 'listenerAid', 'aSync', 'timerAid'];
 
 // modifyFunction(aOriginal, aArray) - allows me to modify a function quickly from within my scripts
@@ -19,7 +19,7 @@ this.modifyFunction = function(aOriginal, aArray) {
 	return ret;
 };
 
-// Object to aid in setting and removing all kinds of event listeners to an object;
+// listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
 // add(obj, type, aListener, capture, maxTriggers) - attaches aListener to obj
 //	obj - (object) to attach the listener to
 //	type - (string) event type to listen for
@@ -244,7 +244,9 @@ this.timerAid = {
 };
 
 moduleAid.LOADMODULE = function() {
-	listenerAid.add(window, 'unload', function(e) { moduleAid.unload("utils"); }, false, true);
+	listenerAid.add(window, 'unload', function(e) {
+		removeObject(window, objName);
+	}, false, true);
 };
 
 moduleAid.UNLOADMODULE = function() {
