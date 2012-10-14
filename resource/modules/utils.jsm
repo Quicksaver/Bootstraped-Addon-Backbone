@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.3';
+moduleAid.VERSION = '1.1.4';
 moduleAid.VARSLIST = ['modifyFunction', 'listenerAid', 'aSync', 'timerAid'];
 
 // modifyFunction(aOriginal, aArray) - allows me to modify a function quickly from within my scripts
@@ -15,8 +15,14 @@ this.modifyFunction = function(aOriginal, aArray) {
 		newCode = newCode.replace(aArray[i][0], aArray[i][1].replace("{([objName])}", objName));
 	}
 	
-	eval('var ret = ' + newCode + ';');
-	return ret;
+	try {
+		eval('var ret = ' + newCode + ';');
+		return ret;
+	}
+	catch(ex) {
+		Cu.reportError(ex);
+		return null;
+	}
 };
 
 // listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
