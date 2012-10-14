@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.2';
+moduleAid.VERSION = '1.0.3';
 moduleAid.VARSLIST = ['dependsOn'];
 
 // dependsOn - object that adds a dependson attribute functionality to xul preference elements.
@@ -118,4 +118,8 @@ moduleAid.LOADMODULE = function() {
 
 moduleAid.UNLOADMODULE = function() {
 	listenerAid.remove(window, "change", dependsOn.changed, false);
-}
+	
+	if(UNLOADED && UNLOADED != APP_SHUTDOWN) {
+		window.close();
+	}
+};
