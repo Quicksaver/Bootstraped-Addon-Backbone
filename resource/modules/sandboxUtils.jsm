@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.2';
+moduleAid.VERSION = '1.1.3';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -259,7 +259,7 @@ this.windowMediator = {
 	
 	callOnLoad: function(aWindow, aCallback, aType, aURI) {
 		listenOnce(aWindow, "load", function(event, aWindow) {
-			if(unloaded) { return; }
+			if(UNLOADED) { return; }
 			
 			if((!aType || aWindow.document.documentElement.getAttribute('windowtype') == aType)
 			&& (!aURI || aWindow.document.documentURI == aURI)) {
@@ -511,7 +511,7 @@ this.overlayAid = {
 	removeOverlayURI: function(aURI, aWith) {
 		// I sometimes call removeOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
 		// This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
-		if(unloaded) { return; }
+		if(UNLOADED) { return; }
 		
 		var path = this.getPath(aWith);
 		var i = this.loadedURI(aURI, path);
@@ -563,7 +563,7 @@ this.overlayAid = {
 		
 		// I sometimes call removeOverlayWindow() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the 
 		// overlays. This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
-		if(unloaded) { return; }
+		if(UNLOADED) { return; }
 		
 		overlayAid.scheduleUnOverlay(aWindow, path);
 	},
@@ -712,7 +712,7 @@ this.overlayAid = {
 	
 	scheduleAll: function(aWindow) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
-		if(unloaded) { return; }
+		if(UNLOADED) { return; }
 		
 		if(aWindow.document.readyState != 'complete') {
 			windowMediator.callOnLoad(aWindow, function() { 
@@ -730,7 +730,7 @@ this.overlayAid = {
 	
 	scheduleUnOverlay: function(aWindow, aWith) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
-		if(unloaded) { return; }
+		if(UNLOADED) { return; }
 		
 		aSync(function() { 
 			if(aWindow) { overlayAid.unOverlayWindow(aWindow, aWith); }
@@ -1840,6 +1840,8 @@ this.isAncestor = function(aNode, aParent, aWindow) {
 //	aNode - (xul element) node to collapse
 //	(optional) show - false collapses aNode, true 'un'collapses it, defaults to false
 this.hideIt = function(aNode, show) {
+	if(!aNode) { return; }
+	
 	if(!show) {
 		aNode.setAttribute('collapsed', 'true');
 	} else {

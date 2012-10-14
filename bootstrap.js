@@ -20,9 +20,9 @@
 //	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
 
-let bootstrapVersion = '1.0.5';
-let unloaded = false;
-let started = false;
+let bootstrapVersion = '1.0.6';
+let UNLOADED = false;
+let STARTED = false;
 let addonData = null;
 
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
@@ -76,7 +76,7 @@ function preparePreferences(window, aName) {
 function listenOnce(window, type, handler, capture) {
 	window.addEventListener(type, function runOnce(event) {
 		window.removeEventListener(type, runOnce, capture);
-		if(!unloaded) {
+		if(!UNLOADED) {
 			handler(event, window);
 		}
 	}, capture);
@@ -119,7 +119,7 @@ function disable() {
 }
 
 function continueStartup(aReason) {
-	started = aReason;
+	STARTED = aReason;
 	
 	// set add-on preferences defaults
 	setDefaults();
@@ -128,7 +128,7 @@ function continueStartup(aReason) {
 }
 
 function startup(aData, aReason) {
-	unloaded = false;
+	UNLOADED = false;
 	addonData = aData;
 	
 	// add resource:// protocol handler so I can access my modules
@@ -141,12 +141,12 @@ function startup(aData, aReason) {
 }
 
 function shutdown(aData, aReason) {
-	unloaded = aReason;
+	UNLOADED = aReason;
 	observerAid.callQuits();
 	
 	if(aReason == APP_SHUTDOWN) { return; }
 	
-	if(started) {
+	if(STARTED) {
 		onShutdown(aReason);
 	}
 	
