@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.1';
+moduleAid.VERSION = '1.1.2';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -828,6 +828,8 @@ this.overlayAid = {
 			try {
 				switch(action.action) {
 					case 'appendChild':
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
+						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node) {
 							if(action.originalParent) {
 								if(action.originalParent.firstChild.nodeName == 'preferences') {
@@ -843,12 +845,16 @@ this.overlayAid = {
 						break;
 						
 					case 'insertBefore':
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
+						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node && action.originalParent && action.originalPos < action.node.parentNode.childNodes.length) {
 							action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
 						}
 						break;
 					
 					case 'removeChild':
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
+						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node && action.originalParent) {
 							if(action.originalPos < action.originalParent.childNodes.length) {
 								action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
@@ -859,12 +865,14 @@ this.overlayAid = {
 						break;
 					
 					case 'modifyAttribute':
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(action.node) {
 							action.node.setAttribute(action.name, action.value);
 						}
 						break;
 					
 					case 'addAttribute':
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(action.node) {
 							action.node.removeAttribute(action.name);
 						}
@@ -899,6 +907,7 @@ this.overlayAid = {
 					case 'appendButton':
 						this.closeCustomize();
 						
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(action.node) {
 							action.node = action.node.parentNode.removeChild(action.node);
 						}
@@ -907,6 +916,17 @@ this.overlayAid = {
 					case 'removeButton':
 						this.closeCustomize();
 						
+						action.node = action.node || aWindow.document.getElementById(action.nodeID);
+						if(!action.palette) {
+							var toolbox = aWindow.document.querySelectorAll('toolbox');
+							for(var a=0; a<toolbox.length; a++) {
+								if(toolbox[a].palette && toolbox[a].palette.id == action.paletteID) {
+									action.palette = toolbox[a].palette;
+									break;
+								}
+							}
+						}
+									
 						if(action.node && action.palette) {
 							action.node = action.palette.appendChild(action.node);
 							
@@ -934,7 +954,9 @@ this.overlayAid = {
 						
 					default: break;
 				}
-			} catch(ex) {}
+			} catch(ex) {
+				Cu.reportError(ex);
+			}
 			
 			if(action.node) {
 				this.updateOverlayedNodes(aWindow, action.node, updateList);
@@ -1229,7 +1251,13 @@ this.overlayAid = {
 		try { node = parent.appendChild(node); } catch(ex) { node = null; }
 		
 		this.updateOverlayedNodes(aWindow, node, updateList);
-		this.traceBack(aWindow, { action: 'appendChild', node: node, originalParent: originalParent });
+		this.traceBack(aWindow, {
+			action: 'appendChild',
+			nodeID: node.id || '',
+			node: node,
+			originalParentID: (originalParent && originalParent.id) ? originalParent.id : '',
+			originalParent: originalParent
+		});
 		return node;
 	},
 	
@@ -1249,9 +1277,22 @@ this.overlayAid = {
 		
 		this.updateOverlayedNodes(aWindow, node, updateList);
 		if(!originalParent) {
-			this.traceBack(aWindow, { action: 'appendChild', node: node });
+			this.traceBack(aWindow, {
+				action: 'appendChild',
+				nodeID: node.id || '',
+				node: node,
+				originalParentID: '',
+				originalParent: null
+			});
 		} else {
-			this.traceBack(aWindow, { action: 'insertBefore', node: node, originalParent: originalParent, originalPos: o });
+			this.traceBack(aWindow, {
+				action: 'insertBefore',
+				nodeID: node.id || '',
+				node: node,
+				originalParentID: originalParent.id || '',
+				originalParent: originalParent,
+				originalPos: o
+			});
 		}
 		
 		return node;
@@ -1273,15 +1314,33 @@ this.overlayAid = {
 		try { node = node.parentNode.removeChild(node); } catch(ex) { node = null; }
 		
 		this.updateOverlayedNodes(aWindow, node, updateList);
-		this.traceBack(aWindow, { action: 'removeChild', node: node, originalParent: originalParent, originalPos: o });
+		this.traceBack(aWindow, {
+			action: 'removeChild',
+			nodeID: node.id || '',
+			node: node,
+			originalParentID: (originalParent && originalParent.id) ? originalParent.id : '',
+			originalParent: originalParent,
+			originalPos: o
+		});
 		return node;
 	},
 	
 	setAttribute: function(aWindow, node, attr) {
 		if(node.hasAttribute(attr.name)) {
-			this.traceBack(aWindow, { action: 'modifyAttribute', node: node, name: attr.name, value: node.getAttribute(attr.name) });
+			this.traceBack(aWindow, {
+				action: 'modifyAttribute',
+				nodeID: node.id || '',
+				node: node,
+				name: attr.name,
+				value: node.getAttribute(attr.name)
+			});
 		} else {
-			this.traceBack(aWindow, { action: 'addAttribute', node: node, name: attr.name });
+			this.traceBack(aWindow, {
+				action: 'addAttribute',
+				nodeID: node.id || '',
+				node: node,
+				name: attr.name
+			});
 		}
 		
 		try { node.setAttribute(attr.name, attr.value); } catch(ex) {}
@@ -1293,7 +1352,10 @@ this.overlayAid = {
 			// these have to come before the actual window element
 			node = aWindow.document.insertBefore(node, aWindow.document.documentElement);
 		} catch(ex) { node = null; }
-		this.traceBack(aWindow, { action: 'appendXMLSS', node: node });
+		this.traceBack(aWindow, {
+			action: 'appendXMLSS',
+			node: node
+		});
 		return node;
 	},
 	
@@ -1307,7 +1369,10 @@ this.overlayAid = {
 				var prefs = aWindow.document.importNode(node);
 				prefs = prefPane.appendChild(prefs);
 			} catch(ex) { prefs = null; }
-			this.traceBack(aWindow, { action: 'addPreferencesElement', prefs: prefs });
+			this.traceBack(aWindow, {
+				action: 'addPreferencesElement',
+				prefs: prefs
+			});
 			return;
 		}
 		
@@ -1319,7 +1384,10 @@ this.overlayAid = {
 				var pref = aWindow.document.importNode(node.childNodes[p]);
 				pref = prefs.appendChild(pref);
 			} catch(ex) { pref = null; }
-			this.traceBack(aWindow, { action: 'addPreference', pref: pref });
+			this.traceBack(aWindow, {
+				action: 'addPreference',
+				pref: pref
+			});
 		}
 	},
 	
@@ -1367,7 +1435,11 @@ this.overlayAid = {
 			}
 		}
 		
-		this.traceBack(aWindow, { action: 'appendButton', node: node });
+		this.traceBack(aWindow, {
+			action: 'appendButton',
+			nodeID: node.id || '',
+			node: node
+		});
 		return node;
 	},
 	
@@ -1375,7 +1447,13 @@ this.overlayAid = {
 		this.closeCustomize();
 		
 		node = node.parentNode.removeChild(node);
-		this.traceBack(aWindow, { action: 'removeButton', node: node, palette: palette });
+		this.traceBack(aWindow, {
+			action: 'removeButton',
+			nodeID: node.id || '',
+			node: node,
+			paletteID: palette.id || '',
+			palette: palette
+		});
 	},
 	
 	closeCustomize: function() {
