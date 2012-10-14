@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.5',
+	version: '2.0.6',
 	modules: [],
 	moduleVars: {},
 	
@@ -81,13 +81,16 @@ this.moduleAid = {
 				}
 				this.modules[i].loaded = true;
 			} else {
-				aSync(function() {
-					try { moduleAid.modules[i].load(); }
+				this.modules[i].aSync = aSync(function() {
+					try {
+						moduleAid.modules[i].load();
+					}
 					catch(ex) {
 						Cu.reportError(ex);
 						moduleAid.unload(aModule, true);
 						return;
-					}	
+					}
+					delete moduleAid.modules[i].aSync;
 					moduleAid.modules[i].loaded = true; 
 				}, 500);
 			}
