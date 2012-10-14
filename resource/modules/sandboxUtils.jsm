@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.2.1';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute'];
+moduleAid.VERSION = '1.2.2';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -699,11 +699,7 @@ this.overlayAid = {
 			if(this.isPersist(overlay, id)) {
 				for(var attr in allRes[document.baseURI][id]) {
 					if(this.isPersist(overlay, id, attr)) {
-						if(allRes[document.baseURI][id][attr] != '') {
-							setAttribute(document.getElementById(id), attr, allRes[document.baseURI][id][attr]);
-						} else {
-							removeAttribute(document.getElementById(id), attr);
-						}
+						toggleAttribute(document.getElementById(id), attr, allRes[document.baseURI][id][attr], allRes[document.baseURI][id][attr]);
 					}
 				}
 			}
@@ -1850,11 +1846,7 @@ this.isAncestor = function(aNode, aParent, aWindow) {
 //	aNode - (xul element) node to collapse
 //	(optional) show - false collapses aNode, true 'un'collapses it, defaults to false
 this.hideIt = function(aNode, show) {
-	if(!show) {
-		setAttribute(aNode, 'collapsed', 'true');
-	} else {
-		removeAttribute(aNode, 'collapsed');
-	}
+	toggleAttribute(aNode, 'collapsed', !show);
 };
 
 // trim(str) - trims whitespaces from a string (found in http://blog.stevenlevithan.com/archives/faster-trim-javascript -> trim3())
@@ -1886,6 +1878,26 @@ this.setAttribute = function(obj, attr, val) {
 this.removeAttribute = function(obj, attr) {
 	if(!obj) { return; }
 	obj.removeAttribute(attr);
+};
+
+// toggleAttribute(obj, attr, condition, val) - sets attr on obj if condition is true; I'm uber lazy
+//	see setAttribute()
+//	condition - when true, attr is set with value (str) true, otherwise it removes the attribute
+//	(optional) trueval - (str) value to set attr to if condition is true, defaults to (str) true
+//	(optional) falseval - (str) value to set attr to if condition is false, if not set the attr is removed
+this.toggleAttribute = function(obj, attr, condition, trueval, falseval) {
+	if(!obj) { return; }
+		
+	if(condition) {
+		if(!trueval) { trueval = 'true'; }
+		obj.setAttribute(attr, trueval);
+	} else {
+		if(!falseval) {
+			obj.removeAttribute(attr);
+		} else {
+			obj.setAttribute(attr, falseval);
+		}
+	}
 };
 
 moduleAid.LOADMODULE = function() {
