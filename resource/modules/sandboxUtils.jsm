@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.1.5';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize'];
+moduleAid.VERSION = '1.2.0';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -1795,6 +1795,23 @@ this.objectWatcher = {
 		
 		return true;
 	}
+};
+
+// dispatch(obj, properties) - creates and dispatches an event and returns (bool) whether preventDefault was called on it
+//	obj - (xul element) object to dispatch the event from, it will be e.target
+//	properties - (obj) expecting the following sub properties defining the following event characteristics:
+//		type - (str) the event type
+//		(optional) bubbles - (bool) defaults to true
+//		(optional) cancelable - (bool) defaults to true
+this.dispatch = function(obj, properties) {
+	if(!obj.ownerDocument || !obj.dispatchEvent || !properties || !properties.type) { return false; }
+	
+	var bubbles = properties.bubbles || true;
+	var cancelable = properties.cancelable || true;
+	
+	var event = obj.ownerDocument.createEvent('Event');
+	event.initEvent(properties.type, bubbles, cancelable);
+	return obj.dispatchEvent(event);
 };
 
 // compareFunction(a, b, strict) - returns (bool) if a === b
