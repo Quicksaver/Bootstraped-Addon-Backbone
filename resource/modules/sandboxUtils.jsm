@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.1.4';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
+moduleAid.VERSION = '1.1.5';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -905,7 +905,7 @@ this.overlayAid = {
 						break;
 					
 					case 'appendButton':
-						this.closeCustomize();
+						closeCustomize();
 						
 						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(action.node) {
@@ -914,7 +914,7 @@ this.overlayAid = {
 						break;
 					
 					case 'removeButton':
-						this.closeCustomize();
+						closeCustomize();
 						
 						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(!action.palette) {
@@ -1412,7 +1412,7 @@ this.overlayAid = {
 	},
 	
 	appendButton: function(aWindow, palette, node) {
-		this.closeCustomize();
+		closeCustomize();
 		
 		node = palette.appendChild(node);
 		
@@ -1445,7 +1445,7 @@ this.overlayAid = {
 	},
 	
 	removeButton: function(aWindow, palette, node) {
-		this.closeCustomize();
+		closeCustomize();
 		
 		node = node.parentNode.removeChild(node);
 		this.traceBack(aWindow, {
@@ -1455,10 +1455,6 @@ this.overlayAid = {
 			paletteID: palette.id || '',
 			palette: palette
 		});
-	},
-	
-	closeCustomize: function() {
-		windowMediator.callOnAll(function(aWindow) { aWindow.close(); }, null, "chrome://global/content/customizeToolbar.xul");
 	}
 };
 
@@ -1858,6 +1854,11 @@ this.trim = function(str) {
 	}
 	
 	return str.substring(Math.max(str.search(/\S/), 0), str.search(/\S\s*$/) + 1);
+};
+
+// closeCustomize() - useful for when you want to close the customize toolbar dialogs for whatever reason
+this.closeCustomize = function() {
+	windowMediator.callOnAll(function(aWindow) { try { aWindow.close(); } catch(ex) {} }, null, "chrome://global/content/customizeToolbar.xul");
 };
 
 moduleAid.LOADMODULE = function() {
