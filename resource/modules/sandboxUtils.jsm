@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.3';
+moduleAid.VERSION = '1.1.4';
 moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'compareFunction', 'isAncestor', 'hideIt', 'trim'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
@@ -1136,8 +1136,9 @@ this.overlayAid = {
 			// Handle if node with same id was found
 			
 			if(node) {
-				// Don't process if id mismatches nodename; I should just make sure this doesn't happen in my overlays
+				// Don't process if id mismatches nodename or if parents mismatch; I should just make sure this doesn't happen in my overlays
 				if(node.nodeName != overlayNode.nodeName) { continue; }
+				if(overlayNode.parentNode.nodeName != 'overlay' && node.parentNode.id != overlayNode.parentNode.id) { continue; }
 				
 				// If removeelement attribute is true, remove the element and do nothing else
 				if(overlayNode.getAttribute('removeelement') == 'true') {
