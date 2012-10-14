@@ -1,5 +1,5 @@
-moduleAid.VERSION = '1.2.0';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize'];
+moduleAid.VERSION = '1.2.1';
+moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute'];
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
@@ -700,9 +700,9 @@ this.overlayAid = {
 				for(var attr in allRes[document.baseURI][id]) {
 					if(this.isPersist(overlay, id, attr)) {
 						if(allRes[document.baseURI][id][attr] != '') {
-							document.getElementById(id).setAttribute(attr, allRes[document.baseURI][id][attr]);
+							setAttribute(document.getElementById(id), attr, allRes[document.baseURI][id][attr]);
 						} else {
-							document.getElementById(id).removeAttribute(attr);
+							removeAttribute(document.getElementById(id), attr);
 						}
 					}
 				}
@@ -866,16 +866,12 @@ this.overlayAid = {
 					
 					case 'modifyAttribute':
 						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						if(action.node) {
-							action.node.setAttribute(action.name, action.value);
-						}
+						setAttribute(action.node, action.name, action.value);
 						break;
 					
 					case 'addAttribute':
 						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						if(action.node) {
-							action.node.removeAttribute(action.name);
-						}
+						removeAttribute(action.node, action.name);
 						break;
 					
 					case 'appendXMLSS':
@@ -1854,12 +1850,10 @@ this.isAncestor = function(aNode, aParent, aWindow) {
 //	aNode - (xul element) node to collapse
 //	(optional) show - false collapses aNode, true 'un'collapses it, defaults to false
 this.hideIt = function(aNode, show) {
-	if(!aNode) { return; }
-	
 	if(!show) {
-		aNode.setAttribute('collapsed', 'true');
+		setAttribute(aNode, 'collapsed', 'true');
 	} else {
-		aNode.removeAttribute('collapsed');
+		removeAttribute(aNode, 'collapsed');
 	}
 };
 
@@ -1876,6 +1870,22 @@ this.trim = function(str) {
 // closeCustomize() - useful for when you want to close the customize toolbar dialogs for whatever reason
 this.closeCustomize = function() {
 	windowMediator.callOnAll(function(aWindow) { try { aWindow.close(); } catch(ex) {} }, null, "chrome://global/content/customizeToolbar.xul");
+};
+
+// setAttribute(obj, attr, val) - helper me that saves me the trouble of checking if the obj exists first everywhere in my scripts; yes I'm that lazy
+//	obj - (xul element) to set the attribute
+//	attr - (str) attribute to set
+//	val - (str) value to set for attr
+this.setAttribute = function(obj, attr, val) {
+	if(!obj) { return; }
+	obj.setAttribute(attr, val);
+};
+
+// removeAttribute(obj, attr) - helper me that saves me the trouble of checking if the obj exists first everywhere in my scripts; yes I'm that lazy
+//	see setAttribute()
+this.removeAttribute = function(obj, attr) {
+	if(!obj) { return; }
+	obj.removeAttribute(attr);
 };
 
 moduleAid.LOADMODULE = function() {
