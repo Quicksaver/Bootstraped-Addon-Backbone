@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.3';
+moduleAid.VERSION = '1.2.4';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -1686,7 +1686,7 @@ this.objectWatcher = {
 	},
 	
 	setWatchers: function(obj) {
-		if(typeof(obj) != 'object' || obj === null) { return false; }
+		if(!obj || typeof(obj) != 'object') { return false; }
 		
 		if(obj._propWatchers) { return true; }
 		
