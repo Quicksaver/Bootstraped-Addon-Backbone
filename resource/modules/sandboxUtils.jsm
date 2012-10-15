@@ -1,5 +1,8 @@
-moduleAid.VERSION = '1.2.2';
-moduleAid.VARSLIST = ['prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
+moduleAid.VERSION = '1.2.3';
+moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
+
+// Globals - lets me use objects that I can share through all the windows
+this.Globals = {};
 
 // prefAid - Object to contain and manage all preferences related to the add-on (and others if necessary)
 // setDefaults(prefList, branch) - sets the add-on's preferences default values
