@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.8';
+moduleAid.VERSION = '1.2.9';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -1652,7 +1652,6 @@ this.aSync = function(aFunc, aDelay) {
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
 // Note: deleting a watched property does not trigger the watchers, so don't do it! Also setting the watchers on an unset property won't work either.
-// I can't do anything when setting attributes from within the obj.attributes object.
 this.objectWatcher = {
 	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
 	addPropertyWatcher: function(obj, prop, handler, capture) {
@@ -1677,7 +1676,10 @@ this.objectWatcher = {
 				var oldVal = this._propWatchers.properties[prop].value;
 				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
 					if(this._propWatchers.properties[prop].handlers[i].capture) {
-						if(this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal) === false) {
+						var continueHandlers = true;
+						try { continueHandlers = this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal); }
+						catch(ex) { Cu.reportError(ex); }
+						if(continueHandlers === false) {
 							return this._propWatchers.properties[prop].value;
 						}
 					}
@@ -1685,7 +1687,8 @@ this.objectWatcher = {
 				this._propWatchers.properties[prop].value = newVal;
 				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
 					if(!this._propWatchers.properties[prop].handlers[i].capture) {
-						this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal);
+						try { this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal); }
+						catch(ex) { Cu.reportError(ex); }
 					}
 				}
 				return this._propWatchers.properties[prop].value;
@@ -1694,7 +1697,7 @@ this.objectWatcher = {
 		else {
 			for(var i=0; i<obj._propWatchers.properties[prop].handlers.length; i++) {
 				if(compareFunction(obj._propWatchers.properties[prop].handlers[i].handler, handler)
-				&& capture == obj._propWatchers.properties[prop].handlers[i].capture) { return false; }
+				&& capture == obj._propWatchers.properties[prop].handlers[i].capture) { return true; }
 			}
 		}
 		
@@ -1726,21 +1729,25 @@ this.objectWatcher = {
 		return false;
 	},
 	
-	// Attributes part, works by replacing the actual attribute native functions with custom ones (while still using the native ones)
+	// Attributes part, works through delayed DOM Mutation Observers
 	addAttributeWatcher: function(obj, attr, handler, capture) {
 		if(!this.setWatchers(obj)) { return false; }
 		capture = (capture) ? true : false;
 		
 		if(typeof(obj._propWatchers.attributes[attr]) == 'undefined') {
+			obj._propWatchers.disconnect();
+			
 			obj._propWatchers.attributes[attr] = {
 				value: (obj.hasAttribute(attr)) ? obj.getAttribute(attr) : null,
 				handlers: []
 			};
+			
+			obj._propWatchers.reconnect();
 		}
 		else {
 			for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
 				if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
-				&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) { return false; }
+				&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) { return true; }
 			}
 		}
 		
@@ -1758,7 +1765,11 @@ this.objectWatcher = {
 			&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) {
 				obj._propWatchers.attributes[attr].handlers.splice(i, 1);
 				if(obj._propWatchers.attributes[attr].handlers.length == 0) {
+					obj._propWatchers.disconnect();
+					
 					delete obj._propWatchers.attributes[attr];
+					
+					obj._propWatchers.reconnect();
 				}
 				
 				obj._propWatchers.setters--;
@@ -1772,79 +1783,138 @@ this.objectWatcher = {
 	
 	setWatchers: function(obj) {
 		if(!obj || typeof(obj) != 'object') { return false; }
-		
 		if(obj._propWatchers) { return true; }
 		
 		obj._propWatchers = {
 			setters: 0,
 			properties: {},
 			attributes: {},
-			callAttrWatchers: function(obj, attr, newVal, capture) {
-				if(typeof(this.attributes[attr]) == 'undefined') { return true; }
+			mutations: [],
+			scheduler: null,
+			reconnect: function() {
+				var attrList = [];
+				for(var a in this.attributes) {
+					attrList.push(a);
+				}
+				if(attrList.length > 0) {
+					var observerProperties = {
+						attributes: true,
+						attributeOldValue: true
+					};
+					observerProperties.attributeFilter = attrList;
+					this.mutationObserver.observe(obj, observerProperties);
+				}
+			},
+			disconnect: function() {
+				this.mutationObserver.disconnect();
+			},
+			scheduleWatchers: function(mutations, observer) {
+				if(obj._propWatchers.schedule) {
+					obj._propWatchers.schedule.cancel();
+					obj._propWatchers.schedule = null;
+				}
 				
-				var oldVal = this.attributes[attr].value;
+				for(var m=0; m<mutations.length; m++) {
+					obj._propWatchers.mutations.push(mutations[m]);
+				}
+				// the script could become really heavy if it called the main function everytime (width attribute on sidebar and dragging it for instance)
+				// half a second delay ought to relieve things
+				obj._propWatchers.schedule = aSync(obj._propWatchers.callAttrWatchers, 500);
+			},
+			callAttrWatchers: function() {
+				obj._propWatchers.disconnect();
+				var muts = obj._propWatchers.mutations;
+				obj._propWatchers.mutations = [];
 				
-				for(var i = 0; i < this.attributes[attr].handlers.length; i++) {
-					if(this.attributes[attr].handlers[i].capture == capture) {
-						if(this.attributes[attr].handlers[i].handler(obj, attr, oldVal, newVal) === false && capture) { return false; }
+				var attrList = [];
+				for(var attr in obj._propWatchers.attributes) {
+					attrList.push(attr);
+					
+					var changes = 0;
+					var oldValue = false;
+					var newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
+					captureMutations_loop: for(var m=0; m<muts.length; m++) {
+						if(muts[m].attributeName != attr) { continue; }
+						
+						oldValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+						newValue = false;
+						for(var n=m+1; n<muts.length; n++) {
+							if(muts[n].attributeName == attr) {
+								newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+								break;
+							}
+						}
+						if(newValue === false) {
+							newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
+						}
+						
+						if(oldValue === newValue) {
+							newValue = oldValue;
+							muts.splice(m, 1);
+							m--;
+							continue captureMutations_loop;
+						}
+						
+						for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
+							if(obj._propWatchers.attributes[attr].handlers[h].capture) {
+								var continueHandlers = true;
+								try { continueHandlers = obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
+								catch(ex) { Cu.reportError(ex); }
+								
+								if(continueHandlers === false) {
+									for(var n=m+1; n<muts.length; n++) {
+										if(muts[n].attributeName == attr) {
+											muts[n].realOldValue = oldValue;
+											break;
+										}
+									}
+									newValue = oldValue;
+									muts.splice(m, 1);
+									m--;
+									continue captureMutations_loop;
+								}
+							}
+						}
+						
+						changes++;
+					}
+					
+					if(newValue !== null) {
+						obj.setAttribute(attr, newValue);
+					} else {
+						obj.removeAttribute(attr);
+					}
+					
+					if(changes > 0) {
+						for(var m=0; m<muts.length; m++) {
+							if(muts[m].attributeName != attr) { continue; }
+							
+							oldValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+							newValue = false;
+							for(var n=m+1; n<muts.length; n++) {
+								if(muts[n].attributeName == attr) {
+									newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+									break;
+								}
+							}
+							if(newValue === false) {
+								newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
+							}
+							
+							for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
+								if(!obj._propWatchers.attributes[attr].handlers[h].capture) {
+									try { obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
+									catch(ex) { Cu.reportError(ex); }
+								}
+							}
+						}
 					}
 				}
 				
-				if(!capture) {
-					this.attributes[attr].value = newVal;
-				}
-				
-				return true;
+				obj._propWatchers.reconnect();
 			}
 		};
-		
-		// Store all native functions as '_function' and set custom ones to handle attribute changes
-		obj._setAttribute = obj.setAttribute;
-		obj._setAttributeNS = obj.setAttributeNS;
-		obj._setAttributeNode = obj.setAttributeNode;
-		obj._setAttributeNodeNS = obj.setAttributeNodeNS;
-		obj._removeAttribute = obj.removeAttribute;
-		obj._removeAttributeNS = obj.removeAttributeNS;
-		obj._removeAttributeNode = obj.removeAttributeNode;
-		
-		obj.setAttribute = function setAttribute(attr, value) {
-			if(!this._propWatchers.callAttrWatchers(this, attr, value, true)) { return; }
-			this._setAttribute(attr, value);
-			this._propWatchers.callAttrWatchers(this, attr, value, false);
-		};
-		obj.setAttributeNS = function(namespace, attr, value) {
-			if(!this._propWatchers.callAttrWatchers(this, attr, value, true)) { return; }
-			this._setAttributeNS(namespace, attr, value);
-			this._propWatchers.callAttrWatchers(this, attr, value, false);
-		};
-		obj.setAttributeNode = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(this, attr.name, attr.value, true)) { return null; }
-			var ret = this._setAttributeNode(attr);
-			this._propWatchers.callAttrWatchers(this, attr.name, attr.value, false);
-			return ret;
-		};
-		obj.setAttributeNodeNS = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(this, attr.name, attr.value, true)) { return null; }
-			var ret = this._setAttributeNodeNS(attr);
-			this._propWatchers.callAttrWatchers(this, attr.name, attr.value, false);
-			return ret;
-		};
-		obj.removeAttribute = function removeAttribute(attr) {
-			if(!this._propWatchers.callAttrWatchers(this, attr, null, true)) { return; }
-			this._removeAttribute(attr);
-			this._propWatchers.callAttrWatchers(this, attr, null, false);
-		};
-		obj.removeAttributeNS = function(namespace, attr) {
-			if(!this._propWatchers.callAttrWatchers(this, attr, null, true)) { return; }
-			this._removeAttributeNS(namespace, attr);
-			this._propWatchers.callAttrWatchers(this, attr, null, false);
-		};
-		obj.removeAttributeNode = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(this, attr.name, null, true)) { return null; }
-			var ret = this._removeAttributeNode(attr);
-			this._propWatchers.callAttrWatchers(this, attr.name, null, false);
-			return ret;
-		};
+		obj._propWatchers.mutationObserver = new obj.ownerDocument.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers);
 		
 		return true;
 	},
@@ -1852,23 +1922,8 @@ this.objectWatcher = {
 	unsetWatchers: function(obj) {
 		if(typeof(obj) != 'object' || obj === null || !obj._propWatchers || obj._propWatchers.setters > 0) { return false; }
 		
-		obj.setAttribute = obj._setAttribute;
-		obj.setAttributeNS = obj._setAttributeNS;
-		obj.setAttributeNode = obj._setAttributeNode;
-		obj.setAttributeNodeNS = obj._setAttributeNodeNS;
-		obj.removeAttribute = obj._removeAttribute;
-		obj.removeAttributeNS = obj._removeAttributeNS;
-		obj.removeAttributeNode = obj._removeAttributeNode;
-		delete obj._setAttribute;
-		delete obj._setAttributeNS;
-		delete obj._setAttributeNode;
-		delete obj._setAttributeNodeNS;
-		delete obj._removeAttribute;
-		delete obj._removeAttributeNS;
-		delete obj._removeAttributeNode;
-		
+		obj._propWatchers.disconnect();
 		delete obj._propWatchers;
-		
 		return true;
 	}
 };
