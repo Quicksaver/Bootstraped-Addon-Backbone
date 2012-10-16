@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.4';
+moduleAid.VERSION = '1.2.5';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -658,7 +658,7 @@ this.overlayAid = {
 		return false;
 	},
 	
-	persistOverlay: function(document, overlay) {
+	persistOverlay: function(aWindow, overlay) {
 		if(!this.isPersist(overlay)) {
 			return;
 		}
@@ -697,12 +697,34 @@ this.overlayAid = {
 			showArcs(curResource, PlacesUIUtils.localStore.ArcLabelsOut(curResource));
 		}
 		
-		if(!allRes[document.baseURI]) { return; }
-		for(var id in allRes[document.baseURI]) {
+		var uri = aWindow.document.baseURI;
+		if(!allRes[uri]) { return; }
+		for(var id in allRes[uri]) {
+			var node = document.getElementById(id);
+			if(!node) { continue; }
+			
 			if(this.isPersist(overlay, id)) {
-				for(var attr in allRes[document.baseURI][id]) {
+				for(var attr in allRes[uri][id]) {
 					if(this.isPersist(overlay, id, attr)) {
-						toggleAttribute(document.getElementById(id), attr, allRes[document.baseURI][id][attr], allRes[document.baseURI][id][attr]);
+						toggleAttribute(node, attr, allRes[uri][id][attr], allRes[uri][id][attr]);
+						
+						if(attr == 'currentset'
+						&& node.nodeName == 'toolbar'
+						&& node.getAttribute('toolboxid')
+						&& aWindow.document.getElementById(node.getAttribute('toolboxid'))) {
+							var palette = aWindow.document.getElementById(node.getAttribute('toolboxid')).palette;
+							if(!palette) { continue; }
+							
+							var currentset = node.getAttribute('currentset').split(',');
+							for(var c=0; c<currentset.length; c++) {
+								for(var p=0; p<palette.childNodes.length; p++) {
+									if(palette.childNodes[p].id == currentset[c]) {
+										this.insertItem(aWindow, node, palette.childNodes[p]);
+										break;
+									}
+								}
+							}
+						}
 					}
 				}
 			}
@@ -754,6 +776,10 @@ this.overlayAid = {
 	},
 	
 	traceBack: function(aWindow, traceback, unshift) {
+		if(traceback.node) { traceback.nodeID = traceback.node.id; }
+		if(traceback.originalParent) { traceback.originalParentID = traceback.originalParent.id; }
+		if(traceback.palette) { traceback.paletteID = traceback.palette.id; }
+		
 		if(!unshift) {
 			aWindow._OVERLAYS_LOADED[aWindow._BEING_OVERLAYED].traceBack.push(traceback);
 		} else {
@@ -820,6 +846,18 @@ this.overlayAid = {
 		
 		for(var j = aWindow._OVERLAYS_LOADED[i].traceBack.length -1; j >= 0; j--) {
 			var action = aWindow._OVERLAYS_LOADED[i].traceBack[j];
+			if(action.nodeID) { action.node = action.node || aWindow.document.getElementById(action.nodeID); }
+			if(action.originalParentID) { action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID); }
+			if(action.paletteID && !action.palette) {
+				var toolbox = aWindow.document.querySelectorAll('toolbox');
+				for(var a=0; a<toolbox.length; a++) {
+					if(toolbox[a].palette && toolbox[a].palette.id == action.paletteID) {
+						action.palette = toolbox[a].palette;
+						break;
+					}
+				}
+			}
+			
 			if(action.node) {
 				var updateList = this.updateOverlayedNodes(aWindow, action.node);
 			}
@@ -827,8 +865,6 @@ this.overlayAid = {
 			try {
 				switch(action.action) {
 					case 'appendChild':
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node) {
 							if(action.originalParent) {
 								if(action.originalParent.firstChild.nodeName == 'preferences') {
@@ -844,16 +880,12 @@ this.overlayAid = {
 						break;
 						
 					case 'insertBefore':
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node && action.originalParent && action.originalPos < action.node.parentNode.childNodes.length) {
 							action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
 						}
 						break;
 					
 					case 'removeChild':
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID);
 						if(action.node && action.originalParent) {
 							if(action.originalPos < action.originalParent.childNodes.length) {
 								action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
@@ -864,12 +896,10 @@ this.overlayAid = {
 						break;
 					
 					case 'modifyAttribute':
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						setAttribute(action.node, action.name, action.value);
 						break;
 					
 					case 'addAttribute':
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						removeAttribute(action.node, action.name);
 						break;
 					
@@ -902,7 +932,6 @@ this.overlayAid = {
 					case 'appendButton':
 						closeCustomize();
 						
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
 						if(action.node) {
 							action.node = action.node.parentNode.removeChild(action.node);
 						}
@@ -911,17 +940,6 @@ this.overlayAid = {
 					case 'removeButton':
 						closeCustomize();
 						
-						action.node = action.node || aWindow.document.getElementById(action.nodeID);
-						if(!action.palette) {
-							var toolbox = aWindow.document.querySelectorAll('toolbox');
-							for(var a=0; a<toolbox.length; a++) {
-								if(toolbox[a].palette && toolbox[a].palette.id == action.paletteID) {
-									action.palette = toolbox[a].palette;
-									break;
-								}
-							}
-						}
-									
 						if(action.node && action.palette) {
 							action.node = action.palette.appendChild(action.node);
 							
@@ -946,7 +964,15 @@ this.overlayAid = {
 							}
 						}
 						break;
+					
+					case 'insertItem':
+						closeCustomize();
 						
+						if(action.node && action.palette) {
+							action.node = action.palette.appendChild(action.node);
+						}
+						break;
+											
 					default: break;
 				}
 			} catch(ex) {
@@ -1043,7 +1069,7 @@ this.overlayAid = {
 		// Resize the preferences dialogs to fit the content
 		this.sizeToContent(aWindow);
 		
-		this.persistOverlay(aWindow.document, overlay);
+		this.persistOverlay(aWindow, overlay);
 		
 		if(overlay.onload) {
 			overlay.onload(aWindow);
@@ -1249,9 +1275,7 @@ this.overlayAid = {
 		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'appendChild',
-			nodeID: node.id || '',
 			node: node,
-			originalParentID: (originalParent && originalParent.id) ? originalParent.id : '',
 			originalParent: originalParent
 		});
 		return node;
@@ -1275,17 +1299,13 @@ this.overlayAid = {
 		if(!originalParent) {
 			this.traceBack(aWindow, {
 				action: 'appendChild',
-				nodeID: node.id || '',
 				node: node,
-				originalParentID: '',
 				originalParent: null
 			});
 		} else {
 			this.traceBack(aWindow, {
 				action: 'insertBefore',
-				nodeID: node.id || '',
 				node: node,
-				originalParentID: originalParent.id || '',
 				originalParent: originalParent,
 				originalPos: o
 			});
@@ -1312,9 +1332,7 @@ this.overlayAid = {
 		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'removeChild',
-			nodeID: node.id || '',
 			node: node,
-			originalParentID: (originalParent && originalParent.id) ? originalParent.id : '',
 			originalParent: originalParent,
 			originalPos: o
 		});
@@ -1325,7 +1343,6 @@ this.overlayAid = {
 		if(node.hasAttribute(attr.name)) {
 			this.traceBack(aWindow, {
 				action: 'modifyAttribute',
-				nodeID: node.id || '',
 				node: node,
 				name: attr.name,
 				value: node.getAttribute(attr.name)
@@ -1333,7 +1350,6 @@ this.overlayAid = {
 		} else {
 			this.traceBack(aWindow, {
 				action: 'addAttribute',
-				nodeID: node.id || '',
 				node: node,
 				name: attr.name
 			});
@@ -1408,6 +1424,7 @@ this.overlayAid = {
 	
 	appendButton: function(aWindow, palette, node) {
 		closeCustomize();
+		var updateList = this.updateOverlayedNodes(aWindow, node);
 		
 		node = palette.appendChild(node);
 		
@@ -1431,9 +1448,9 @@ this.overlayAid = {
 			}
 		}
 		
+		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'appendButton',
-			nodeID: node.id || '',
 			node: node
 		});
 		return node;
@@ -1441,16 +1458,31 @@ this.overlayAid = {
 	
 	removeButton: function(aWindow, palette, node) {
 		closeCustomize();
+		var updateList = this.updateOverlayedNodes(aWindow, node);
 		
 		node = node.parentNode.removeChild(node);
+		
+		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'removeButton',
-			nodeID: node.id || '',
 			node: node,
-			paletteID: palette.id || '',
 			palette: palette
 		});
-	}
+	},
+	
+	insertItem: function(aWindow, toolbar, node) {
+		closeCustomize();
+		
+		var palette = node.parentNode;
+		
+		toolbar.insertItem(node);
+		
+		this.traceBack(aWindow, {
+			action: 'insertItem',
+			node: node,
+			palette: palette
+		});
+	}	
 };
 
 // stringsAid - use for getting strings out of bundles from .properties locale files
@@ -1799,7 +1831,7 @@ this.objectWatcher = {
 //		(optional) bubbles - (bool) defaults to true
 //		(optional) cancelable - (bool) defaults to true
 this.dispatch = function(obj, properties) {
-	if(!obj.ownerDocument || !obj.dispatchEvent || !properties || !properties.type) { return false; }
+	if(!obj || !obj.ownerDocument || !obj.dispatchEvent || !properties || !properties.type) { return false; }
 	
 	var bubbles = properties.bubbles || true;
 	var cancelable = properties.cancelable || true;
