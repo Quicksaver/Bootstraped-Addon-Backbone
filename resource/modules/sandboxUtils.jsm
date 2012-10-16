@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.5';
+moduleAid.VERSION = '1.2.6';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -1592,7 +1592,8 @@ this.aSync = function(aFunc, aDelay) {
 //		(optional) capture - when (bool) true it cancels setting the attribute if handler returns (bool) false, defaults to (bool) false
 //	removeAttributeWatcher(obj, attr, handler, capture) - unregisters handler as a watcher for object attribute attr changes
 //		see addAttributeWatcher()
-// All handlers expect function(prop, oldVal, newVal), where:
+// All handlers expect function(obj, prop, oldVal, newVal), where:
+//	obj - (xul element or object) where the change occured
 //	prop - (string) name of the property or attribute being set or changed
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
@@ -1616,14 +1617,13 @@ this.objectWatcher = {
 				value: tempVal,
 				handlers: []
 			};
-			obj._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
 			
 			obj.__defineGetter__(prop, function () { return this._propWatchers.properties[prop].value; });
 			obj.__defineSetter__(prop, function (newVal) {
 				var oldVal = this._propWatchers.properties[prop].value;
 				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
 					if(this._propWatchers.properties[prop].handlers[i].capture) {
-						if(this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal) === false) {
+						if(this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal) === false) {
 							return this._propWatchers.properties[prop].value;
 						}
 					}
@@ -1631,7 +1631,7 @@ this.objectWatcher = {
 				this._propWatchers.properties[prop].value = newVal;
 				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
 					if(!this._propWatchers.properties[prop].handlers[i].capture) {
-						this._propWatchers.properties[prop].handlers[i].handler(prop, oldVal, newVal);
+						this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal);
 					}
 				}
 				return this._propWatchers.properties[prop].value;
@@ -1642,9 +1642,9 @@ this.objectWatcher = {
 				if(compareFunction(obj._propWatchers.properties[prop].handlers[i].handler, handler)
 				&& capture == obj._propWatchers.properties[prop].handlers[i].capture) { return false; }
 			}
-			obj._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
 		}
 		
+		obj._propWatchers.properties[prop].handlers.push({ handler: handler, capture: capture });
 		obj._propWatchers.setters++;
 		return true;
 	},
@@ -1682,16 +1682,15 @@ this.objectWatcher = {
 				value: (obj.hasAttribute(attr)) ? obj.getAttribute(attr) : null,
 				handlers: []
 			};
-			obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
 		}
 		else {
 			for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
 				if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
 				&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) { return false; }
 			}
-			obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
 		}
 		
+		obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
 		obj._propWatchers.setters++;
 		return true;
 	},
@@ -1726,18 +1725,14 @@ this.objectWatcher = {
 			setters: 0,
 			properties: {},
 			attributes: {},
-			callAttrWatchers: function(attr, newVal, capture) {
+			callAttrWatchers: function(obj, attr, newVal, capture) {
 				if(typeof(this.attributes[attr]) == 'undefined') { return true; }
 				
 				var oldVal = this.attributes[attr].value;
 				
 				for(var i = 0; i < this.attributes[attr].handlers.length; i++) {
 					if(this.attributes[attr].handlers[i].capture == capture) {
-						if(capture) {
-							if(this.attributes[attr].handlers[i].handler(attr, oldVal, newVal) === false) { return false; }
-						} else {
-							this.attributes[attr].handlers[i].handler(attr, oldVal, newVal);
-						}
+						if(this.attributes[attr].handlers[i].handler(obj, attr, oldVal, newVal) === false && capture) { return false; }
 					}
 				}
 				
@@ -1759,41 +1754,41 @@ this.objectWatcher = {
 		obj._removeAttributeNode = obj.removeAttributeNode;
 		
 		obj.setAttribute = function setAttribute(attr, value) {
-			if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
+			if(!this._propWatchers.callAttrWatchers(this, attr, value, true)) { return; }
 			this._setAttribute(attr, value);
-			this._propWatchers.callAttrWatchers(attr, value, false);
+			this._propWatchers.callAttrWatchers(this, attr, value, false);
 		};
 		obj.setAttributeNS = function(namespace, attr, value) {
-			if(!this._propWatchers.callAttrWatchers(attr, value, true)) { return; }
+			if(!this._propWatchers.callAttrWatchers(this, attr, value, true)) { return; }
 			this._setAttributeNS(namespace, attr, value);
-			this._propWatchers.callAttrWatchers(attr, value, false);
+			this._propWatchers.callAttrWatchers(this, attr, value, false);
 		};
 		obj.setAttributeNode = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
+			if(!this._propWatchers.callAttrWatchers(this, attr.name, attr.value, true)) { return null; }
 			var ret = this._setAttributeNode(attr);
-			this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
+			this._propWatchers.callAttrWatchers(this, attr.name, attr.value, false);
 			return ret;
 		};
 		obj.setAttributeNodeNS = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(attr.name, attr.value, true)) { return null; }
+			if(!this._propWatchers.callAttrWatchers(this, attr.name, attr.value, true)) { return null; }
 			var ret = this._setAttributeNodeNS(attr);
-			this._propWatchers.callAttrWatchers(attr.name, attr.value, false);
+			this._propWatchers.callAttrWatchers(this, attr.name, attr.value, false);
 			return ret;
 		};
 		obj.removeAttribute = function removeAttribute(attr) {
-			if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
+			if(!this._propWatchers.callAttrWatchers(this, attr, null, true)) { return; }
 			this._removeAttribute(attr);
-			this._propWatchers.callAttrWatchers(attr, null, false);
+			this._propWatchers.callAttrWatchers(this, attr, null, false);
 		};
 		obj.removeAttributeNS = function(namespace, attr) {
-			if(!this._propWatchers.callAttrWatchers(attr, null, true)) { return; }
+			if(!this._propWatchers.callAttrWatchers(this, attr, null, true)) { return; }
 			this._removeAttributeNS(namespace, attr);
-			this._propWatchers.callAttrWatchers(attr, null, false);
+			this._propWatchers.callAttrWatchers(this, attr, null, false);
 		};
 		obj.removeAttributeNode = function(attr) {
-			if(!this._propWatchers.callAttrWatchers(attr.name, null, true)) { return null; }
+			if(!this._propWatchers.callAttrWatchers(this, attr.name, null, true)) { return null; }
 			var ret = this._removeAttributeNode(attr);
-			this._propWatchers.callAttrWatchers(attr.name, null, false);
+			this._propWatchers.callAttrWatchers(this, attr.name, null, false);
 			return ret;
 		};
 		
