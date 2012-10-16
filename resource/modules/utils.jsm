@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.1.4';
+moduleAid.VERSION = '1.1.5';
 moduleAid.VARSLIST = ['modifyFunction', 'listenerAid', 'aSync', 'timerAid'];
 
 // modifyFunction(aOriginal, aArray) - allows me to modify a function quickly from within my scripts
@@ -45,11 +45,13 @@ this.listenerAid = {
 	// but if it's set to anything else it will bind the function,
 	// thus I can't have an unbound function with maxTriggers
 	add: function(obj, type, aListener, capture, maxTriggers) {
+		if(!obj || !obj.addEventListener) { return false; }
+		
 		var unboundListener = this.modifyListener(aListener, maxTriggers, true);
 		var listener = this.modifyListener(aListener, maxTriggers);
 		
 		if(this.listening(obj, type, capture, unboundListener) !== false) {
-			return false;
+			return true;
 		}
 		
 		if(maxTriggers === true) {
@@ -73,6 +75,8 @@ this.listenerAid = {
 	},
 	
 	remove: function(obj, type, aListener, capture, maxTriggers) {
+		if(!obj || !obj.removeEventListener) { return false; }
+		
 		var unboundListener = this.modifyListener(aListener, maxTriggers, true);
 			
 		var i = this.listening(obj, type, capture, unboundListener);
