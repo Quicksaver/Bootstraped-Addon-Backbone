@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.6';
+moduleAid.VERSION = '1.2.7';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -505,7 +505,7 @@ this.overlayAid = {
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
 				overlayAid.overlays[i].document = xmlhttp.responseXML;
-				overlayAid.cleanXUL(overlayAid.overlays[i].document, this.overlays[i]);
+				overlayAid.cleanXUL(overlayAid.overlays[i].document, overlayAid.overlays[i]);
 				windowMediator.callOnAll(overlayAid.scheduleAll);
 			}
 		});
