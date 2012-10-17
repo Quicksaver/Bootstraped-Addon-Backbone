@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.2.9';
+moduleAid.VERSION = '1.2.10';
 moduleAid.VARSLIST = ['Globals', 'prefAid', 'styleAid', 'windowMediator', 'window', 'document', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'xmlHttpRequest', 'aSync', 'objectWatcher', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute'];
 
 // Globals - lets me use objects that I can share through all the windows
@@ -128,6 +128,9 @@ this.prefAid = {
 // unload(aName, aPath, isData) - unloads aPath css stylesheet
 //	(optional) aPath
 //	see load()
+// loadIf(aName, aPath, isData, anIf) - conditionally load or unload a stylesheet
+//	anIf - true calls load(), false calls unload()
+//	see load()
 // loaded(aName, aPath) - returns (int) with corresponding sheet index in sheets[] if aName or aPath has been loaded, returns (bool) false otherwise
 //	see unload()
 this.styleAid = {
@@ -181,6 +184,14 @@ this.styleAid = {
 			return true;
 		}
 		return false;
+	},
+	
+	loadIf: function(aName, aPath, isData, anIf) {
+		if(anIf) {
+			this.load(aName, aPath, isData);
+		} else {
+			this.unload(aName, aPath, isData);
+		}
 	},
 	
 	loaded: function(aName, aPath) {
