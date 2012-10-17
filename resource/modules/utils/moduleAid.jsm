@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.7',
+	version: '2.1.0',
 	modules: [],
 	moduleVars: {},
 	
@@ -54,6 +54,7 @@ this.moduleAid = {
 			unload: (this.UNLOADMODULE) ? this.UNLOADMODULE : null,
 			vars: (this.VARSLIST) ? this.VARSLIST : null,
 			version: (this.VERSION) ? this.VERSION : null,
+			lazy: (this.LAZY) ? this.LAZY : null,
 			loaded: false,
 			failed: false
 		};
@@ -63,6 +64,7 @@ this.moduleAid = {
 		delete this.LOADMODULE;
 		delete this.UNLOADMODULE;
 		delete this.VERSION;
+		delete this.LAZY;
 		
 		try { this.createVars(this.modules[i].vars); }
 		catch(ex) {
@@ -135,6 +137,15 @@ this.moduleAid = {
 		// We can't unload modules in i++ mode for two reasons:
 		// One: dependencies, some modules require others to run, so by unloading in the inverse order they were loaded we are assuring dependencies are maintained
 		// Two: creates endless loops when unloading a module failed, it would just keep trying to unload that module
+		// We also need to unload main modules before lazy (utils) modules.
+		var i = moduleAid.modules.length -1;
+		while(i > 0) {
+			if(!moduleAid.modules[i].lazy) {
+				moduleAid.unload(moduleAid.modules[i].name);
+			}
+			i--;
+		}
+		
 		var i = moduleAid.modules.length -1;
 		while(i > 0) {
 			moduleAid.unload(moduleAid.modules[i].name);

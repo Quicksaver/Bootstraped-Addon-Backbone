@@ -21,7 +21,7 @@
 // disable() - disables the add-on
 // The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
 
-let bootstrapVersion = '1.0.6';
+let bootstrapVersion = '1.1.0';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
@@ -43,7 +43,7 @@ function prepareObject(window, aName) {
 	window[objectName] = {
 		objName: objectName,
 		objPathString: objPathString,
-		
+		_sandbox: this,
 		// every supposedly global variable is inaccessible because bootstraped means sandboxed, so I have to reference all these;
 		// it's easier to reference more specific objects from within the modules for better control, only setting these two here because they're more generalized
 		window: window,
@@ -52,15 +52,15 @@ function prepareObject(window, aName) {
 		$$: function(sel) { return window.document.querySelectorAll(sel); }
 	};
 	
-	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/moduleAid.jsm", window[objectName]);
-	window[objectName].moduleAid.load("utils");
+	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/utils/moduleAid.jsm", window[objectName]);
+	window[objectName].moduleAid.load("utils/windowUtils");
 }
 
 function removeObject(window, aName) {
 	let objectName = aName || objName;
 	
 	if(window[objectName]) {
-		window[objectName].moduleAid.unload("utils");
+		window[objectName].moduleAid.unload("utils/windowUtils");
 		delete window[objectName];
 	}
 }
@@ -71,7 +71,7 @@ function preparePreferences(window, aName) {
 	if(!window[objectName]) {
 		prepareObject(window, objectName);
 	}
-	window[objectName].moduleAid.load("preferencesUtils");
+	window[objectName].moduleAid.load("utils/preferencesUtils");
 }
 
 function listenOnce(window, type, handler, capture) {
@@ -102,12 +102,12 @@ function setResourceHandler() {
 	resource.setSubstitution(objPathString, alias);
 	
 	// Get the utils.jsm module into our sandbox
-	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/moduleAid.jsm", this);
-	moduleAid.load("sandboxUtils");
+	Services.scriptloader.loadSubScript("resource://"+objPathString+"/modules/utils/moduleAid.jsm", this);
+	moduleAid.load("utils/sandboxUtils");
 }
 
 function removeResourceHandler() {
-	moduleAid.unload("sandboxUtils");
+	moduleAid.unload("utils/sandboxUtils");
 	
 	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
 	resource.setSubstitution(objPathString, null);

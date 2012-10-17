@@ -1,4 +1,5 @@
 moduleAid.VERSION = '1.0.3';
+moduleAid.LAZY = true;
 moduleAid.VARSLIST = ['dependsOn'];
 
 // dependsOn - object that adds a dependson attribute functionality to xul preference elements.
