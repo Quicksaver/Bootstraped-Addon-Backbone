@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
@@ -137,8 +137,4 @@ this.listenerAid = {
 		}
 		return newListener;
 	}
-};
-
-moduleAid.UNLOADMODULE = function() {
-	listenerAid.clean();
 };
