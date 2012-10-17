@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.0.6',
+	version: '2.0.7',
 	modules: [],
 	moduleVars: {},
 	
@@ -82,6 +82,8 @@ this.moduleAid = {
 				this.modules[i].loaded = true;
 			} else {
 				this.modules[i].aSync = aSync(function() {
+					if(typeof(moduleAid) == 'undefined') { return; } // when disabling the add-on before it's had time to perform the load call
+					
 					try {
 						moduleAid.modules[i].load();
 					}
