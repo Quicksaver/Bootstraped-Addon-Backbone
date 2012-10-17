@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -122,10 +122,6 @@ this.overlayAid = {
 		if(i === false) { return; }
 		
 		aWindow._OVERLAYS_LOADED[i].remove = true;
-		
-		// I sometimes call removeOverlayWindow() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the 
-		// overlays. This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
-		if(UNLOADED) { return; }
 		
 		overlayAid.scheduleUnOverlay(aWindow, path);
 	},
@@ -268,7 +264,7 @@ this.overlayAid = {
 		var uri = aWindow.document.baseURI;
 		if(!allRes[uri]) { return; }
 		for(var id in allRes[uri]) {
-			var node = document.getElementById(id);
+			var node = aWindow.document.getElementById(id);
 			if(!node) { continue; }
 			
 			if(this.isPersist(overlay, id)) {
@@ -505,7 +501,7 @@ this.overlayAid = {
 						break;
 					
 					case 'appendXMLSS':
-						if(action.node) {
+						if(action.node && action.node.parentNode) {
 							action.node = action.node.parentNode.removeChild(action.node);
 						}
 						break;
