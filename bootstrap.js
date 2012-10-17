@@ -19,6 +19,7 @@
 //	handler - (function(event, window)) - method to be called when event is triggered
 //	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
+// The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
 
 let bootstrapVersion = '1.0.6';
 let UNLOADED = false;

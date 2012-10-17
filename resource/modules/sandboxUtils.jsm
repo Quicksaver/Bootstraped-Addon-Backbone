@@ -133,6 +133,7 @@ this.prefAid = {
 //	see load()
 // loaded(aName, aPath) - returns (int) with corresponding sheet index in sheets[] if aName or aPath has been loaded, returns (bool) false otherwise
 //	see unload()
+// Note: Firefox 16 implements a bunch of unprefixed declarations, in particular gradients which I use a lot
 this.styleAid = {
 	sheets: [],
 	
@@ -1663,6 +1664,7 @@ this.aSync = function(aFunc, aDelay) {
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
 // Note: deleting a watched property does not trigger the watchers, so don't do it! Also setting the watchers on an unset property won't work either.
+// DOM Mutation Observers were implemented in Firefox 14
 this.objectWatcher = {
 	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
 	addPropertyWatcher: function(obj, prop, handler, capture) {
