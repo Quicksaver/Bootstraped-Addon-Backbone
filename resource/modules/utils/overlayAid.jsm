@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.1';
+moduleAid.VERSION = '2.0.2';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -64,6 +64,12 @@ this.overlayAid = {
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
 				overlayAid.overlays[i].document = xmlhttp.responseXML;
+				
+				if(overlayAid.overlays[i].document.querySelector('parsererror')) {
+					Cu.reportError(overlayAid.overlays[i].document.querySelector('parsererror').textContent);
+					return;
+				}
+				
 				overlayAid.cleanXUL(overlayAid.overlays[i].document, overlayAid.overlays[i]);
 				windowMediator.callOnAll(overlayAid.scheduleAll);
 			}
@@ -110,6 +116,12 @@ this.overlayAid = {
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
 				aWindow._OVERLAYS_LOADED[i].document = xmlhttp.responseXML;
+				
+				if(aWindow._OVERLAYS_LOADED[i].document.querySelector('parsererror')) {
+					Cu.reportError(aWindow._OVERLAYS_LOADED[i].document.querySelector('parsererror').textContent);
+					return;
+				}
+				
 				overlayAid.cleanXUL(aWindow._OVERLAYS_LOADED[i].document, aWindow._OVERLAYS_LOADED[i]);
 				overlayAid.scheduleAll(aWindow);
 			}
