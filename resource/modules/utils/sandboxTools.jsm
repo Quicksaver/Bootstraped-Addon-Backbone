@@ -65,7 +65,7 @@ this.compareFunction = function(a, b, strict) {
 	return false;
 };
 
-// isAncestor(aNode, aParent, aWindow) - Checks if aNode decends from aParent
+// isAncestor(aNode, aParent) - Checks if aNode decends from aParent
 //	aNode - (xul element) node to check for ancestry
 //	aParent - (xul element) node to check if ancestor of aNode
 //	(dont set) aWindow - to be used internally by isAncestor()
