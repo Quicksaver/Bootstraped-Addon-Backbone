@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -39,11 +39,18 @@ this.objectWatcher = {
 			
 			obj._propWatchers.properties[prop] = {
 				value: tempVal,
-				handlers: []
+				handlers: [],
+				handling: false
 			};
 			
 			obj.__defineGetter__(prop, function () { return this._propWatchers.properties[prop].value; });
 			obj.__defineSetter__(prop, function (newVal) {
+				if(this._propWatchers.properties[prop].handling) {
+					this._propWatchers.properties[prop].value = newVal;
+					return this._propWatchers.properties[prop].value;
+				}
+				this._propWatchers.properties[prop].handling = true;
+				
 				var oldVal = this._propWatchers.properties[prop].value;
 				for(var i = 0; i < this._propWatchers.properties[prop].handlers.length; i++) {
 					if(this._propWatchers.properties[prop].handlers[i].capture) {
@@ -51,6 +58,7 @@ this.objectWatcher = {
 						try { continueHandlers = this._propWatchers.properties[prop].handlers[i].handler(this, prop, oldVal, newVal); }
 						catch(ex) { Cu.reportError(ex); }
 						if(continueHandlers === false) {
+							this._propWatchers.properties[prop].handling = false;
 							return this._propWatchers.properties[prop].value;
 						}
 					}
@@ -62,6 +70,8 @@ this.objectWatcher = {
 						catch(ex) { Cu.reportError(ex); }
 					}
 				}
+				
+				this._propWatchers.properties[prop].handling = false;
 				return this._propWatchers.properties[prop].value;
 			});
 		}
