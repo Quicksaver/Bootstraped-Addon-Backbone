@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.3';
+moduleAid.VERSION = '2.0.4';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -453,6 +453,20 @@ this.overlayAid = {
 			aWindow._OVERLAYS_LOADED[i].onunload(aWindow);
 		}
 		
+		// If the window has been closed, there's no point in regressing all of the DOM changes, only the actual unload scripts may be necessary
+		if(aWindow.closed) {
+			if(!aWindow._OVERLAYS_LOADED[i].document || aWindow._OVERLAYS_LOADED[i].remove) {
+				aWindow._OVERLAYS_LOADED.splice(i, 1);
+			} else if(aWindow._OVERLAYS_LOADED[i].document) {
+				aWindow._OVERLAYS_LOADED[i].loaded = false;
+				aWindow._OVERLAYS_LOADED[i].traceBack = [];
+			}
+			if(reschedule) {
+				this.scheduleAll(aWindow);
+			}
+			return;
+		}
+		
 		for(var j = aWindow._OVERLAYS_LOADED[i].traceBack.length -1; j >= 0; j--) {
 			var action = aWindow._OVERLAYS_LOADED[i].traceBack[j];
 			if(action.nodeID) { action.node = action.node || aWindow.document.getElementById(action.nodeID); }
@@ -610,6 +624,7 @@ this.overlayAid = {
 			aWindow._OVERLAYS_LOADED.splice(i, 1);
 		} else if(aWindow._OVERLAYS_LOADED[i].document) {
 			aWindow._OVERLAYS_LOADED[i].loaded = false;
+			aWindow._OVERLAYS_LOADED[i].traceBack = [];
 		}
 		if(reschedule) {
 			this.scheduleAll(aWindow);
