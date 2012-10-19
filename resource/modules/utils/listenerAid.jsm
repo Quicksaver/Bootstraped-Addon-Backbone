@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.1';
+moduleAid.VERSION = '2.0.2';
 moduleAid.LAZY = true;
 
 // listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
@@ -36,6 +36,7 @@ this.listenerAid = {
 		
 		var newHandler = {
 			obj: obj,
+			objID: obj.id,
 			type: type,
 			unboundListener: unboundListener,
 			listener: listener,
@@ -66,6 +67,9 @@ this.listenerAid = {
 	
 	listening: function(obj, type, capture, unboundListener) {
 		for(var i=0; i<this.handlers.length; i++) {
+			if(!this.handlers[i].obj && this.handlers[i].objID) {
+				this.handlers[i].obj = $(this.handlers[i].objID);
+			}
 			if(this.handlers[i].obj == obj && this.handlers[i].type == type && this.handlers[i].capture == capture && compareFunction(this.handlers[i].unboundListener, unboundListener)) {
 				return i;
 			}
@@ -76,6 +80,9 @@ this.listenerAid = {
 	clean: function() {
 		var i = 0;
 		while(i < this.handlers.length) {
+			if(!this.handlers[i].obj && this.handlers[i].objID) {
+				this.handlers[i].obj = $(this.handlers[i].objID);
+			}
 			if(this.handlers[i].obj && this.handlers[i].obj.removeEventListener) {
 				this.handlers[i].obj.removeEventListener(this.handlers[i].type, this.handlers[i].listener, this.handlers[i].capture);
 			}
