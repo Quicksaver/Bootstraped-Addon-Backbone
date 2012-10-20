@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // xmlHttpRequest(url, callback, method, async) - aid for quickly using the nsIXMLHttpRequest interface
@@ -44,12 +44,12 @@ this.aSync = function(aFunc, aDelay) {
 //		(optional) bubbles - (bool) defaults to true
 //		(optional) cancelable - (bool) defaults to true
 this.dispatch = function(obj, properties) {
-	if(!obj || !obj.ownerDocument || !obj.dispatchEvent || !properties || !properties.type) { return false; }
+	if(!obj || (!obj.ownerDocument && !obj.document) || !obj.dispatchEvent || !properties || !properties.type) { return false; }
 	
 	var bubbles = properties.bubbles || true;
 	var cancelable = properties.cancelable || true;
 	
-	var event = obj.ownerDocument.createEvent('Event');
+	var event = (obj.ownerDocument) ? obj.ownerDocument.createEvent('Event') : obj.document.createEvent('Event');
 	event.initEvent(properties.type, bubbles, cancelable);
 	return obj.dispatchEvent(event);
 };
