@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.1';
+moduleAid.VERSION = '2.0.2';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -198,9 +198,10 @@ this.objectWatcher = {
 				for(var m=0; m<mutations.length; m++) {
 					obj._propWatchers.mutations.push(mutations[m]);
 				}
+				
 				// the script could become really heavy if it called the main function everytime (width attribute on sidebar and dragging it for instance)
-				// half a second delay ought to relieve things
-				obj._propWatchers.schedule = aSync(obj._propWatchers.callAttrWatchers, 500);
+				// I'm simply following the changes asynchronously; any delays for heavily changed attributes should be handled properly by the actual handlers.
+				obj._propWatchers.schedule = aSync(obj._propWatchers.callAttrWatchers);
 			},
 			callAttrWatchers: function() {
 				obj._propWatchers.disconnect();
