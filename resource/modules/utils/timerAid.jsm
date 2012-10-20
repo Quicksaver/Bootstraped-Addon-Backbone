@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // timerAid - Object to aid in setting, initializing and cancelling timers
@@ -44,6 +44,15 @@ this.timerAid = {
 		return false;
 	},
 	
+	fire: function(name) {
+		if(this.timers[name]) {
+			aSync(this.timers[name].handler);
+			if(this.timers[name].timer.type == Ci.nsITimer.TYPE_ONE_SHOT) {
+				this.cancel(name);
+			}
+		}
+	},
+	
 	clean: function() {
 		for(var timerObj in this.timers) {
 			this.cancel(timerObj);
@@ -66,15 +75,19 @@ this.timerAid = {
 	_switchType: function(type) {
 		switch(type) {
 			case 'slack':
+			case Ci.nsITimer.TYPE_REPEATING_SLACK:
 				return Ci.nsITimer.TYPE_REPEATING_SLACK;
 				break;
 			case 'precise':
+			case Ci.nsITimer.TYPE_REPEATING_PRECISE:
 				return Ci.nsITimer.TYPE_REPEATING_PRECISE;
 				break;
 			case 'precise_skip':
+			case Ci.nsITimer.TYPE_REPEATING_PRECISE_CAN_SKIP:
 				return Ci.nsITimer.TYPE_REPEATING_PRECISE_CAN_SKIP;
 				break;
 			case 'once':
+			case Ci.nsITimer.TYPE_ONE_SHOT:
 			default:
 				return Ci.nsITimer.TYPE_ONE_SHOT;
 				break;
