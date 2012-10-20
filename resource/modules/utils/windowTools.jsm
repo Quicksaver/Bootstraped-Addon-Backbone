@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // modifyFunction(aOriginal, aArray) - allows me to modify a function quickly from within my scripts
@@ -30,4 +30,4 @@ this.modifyFunction = function(aOriginal, aArray) {
 //	(optional) aDelay - (int) msec to set the timer, defaults to 0msec
 this.aSync = function(aFunc, aDelay) {
 	return timerAid.create(aFunc, (!aDelay) ? 0 : aDelay);
-}
+};
