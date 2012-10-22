@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.1';
+moduleAid.VERSION = '2.1.0';
 moduleAid.LAZY = true;
 
 // xmlHttpRequest(url, callback, method, async) - aid for quickly using the nsIXMLHttpRequest interface
@@ -110,4 +110,28 @@ this.trim = function(str) {
 // closeCustomize() - useful for when you want to close the customize toolbar dialogs for whatever reason
 this.closeCustomize = function() {
 	windowMediator.callOnAll(function(aWindow) { try { aWindow.close(); } catch(ex) {} }, null, "chrome://global/content/customizeToolbar.xul");
+};
+
+// replaceObjStrings(node) - replace all objName and objPathString references in the node attributes and its children with the proper names
+//	node - (xul element) to replace the strings in
+this.replaceObjStrings = function(node) {
+	if(!node) { return; }
+	
+	if(node.attributes) {
+		for(var a=0; a<node.attributes.length; a++) {
+			// Replace objName with this objName in every attribute
+			while(node.attributes[a].value.indexOf('objName') > -1) {
+				node.attributes[a].value = node.attributes[a].value.replace('objName', objName);
+			}
+			while(node.attributes[a].value.indexOf('objPathString') > -1) {
+				node.attributes[a].value = node.attributes[a].value.replace('objPathString', objPathString);
+			}
+		}
+	}
+	
+	var curChild = node.firstChild;
+	while(curChild) {
+		replaceObjStrings(curChild);
+		curChild = curChild.nextSibling;
+	}
 };

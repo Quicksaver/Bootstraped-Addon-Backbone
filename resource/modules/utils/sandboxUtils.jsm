@@ -1,6 +1,6 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
-moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
+moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
 
 // Globals - lets me use objects that I can share through all the windows
 this.Globals = {};
@@ -59,6 +59,9 @@ this.trim = function(str) { loadSandboxTools(); return trim(str); };
 // closeCustomize() - useful for when you want to close the customize toolbar dialogs for whatever reason
 this.closeCustomize = function() { loadSandboxTools(); return closeCustomize(); };
 
+// replaceObjStrings() - replace all objName and objPathString references in the node attributes and its children with the proper names
+this.replaceObjStrings = function(node) { loadSandboxTools(); return replaceObjStrings(node); };
+
 // setAttribute() - helper me that saves me the trouble of checking if the obj exists first everywhere in my scripts; yes I'm that lazy
 this.setAttribute = function(obj, attr, val) { loadAttributesTools(); return setAttribute(obj, attr, val); };
 
@@ -77,6 +80,7 @@ this.loadSandboxTools = function() {
 	delete this.hideIt;
 	delete this.trim;
 	delete this.closeCustomize;
+	delete this.replaceObjStrings;
 	moduleAid.load('utils/sandboxTools');
 };
 
