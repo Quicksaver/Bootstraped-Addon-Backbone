@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.0';
+moduleAid.VERSION = '2.1.1';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -86,15 +86,15 @@ this.overlayAid = {
 	},
 	
 	removeOverlayURI: function(aURI, aWith) {
-		// I sometimes call removeOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
-		// This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll().
-		if(UNLOADED) { return; }
-		
 		var path = this.getPath(aWith);
 		var i = this.loadedURI(aURI, path);
 		if(i === false) { return; }
 		
-		this.overlays.splice(i, 1);
+		// I sometimes call removeOverlayURI() when unloading modules, but these functions are also called when shutting down the add-on, preventing me from unloading the overlays.
+		// This makes it so it keeps the reference to the overlay when shutting down so it's properly removed in unloadAll() if it hasn't been done so already.
+		if(!UNLOADED) {
+			this.overlays.splice(i, 1);
+		}
 		
 		windowMediator.callOnAll(function(aWindow) {
 			overlayAid.scheduleUnOverlay(aWindow, path);
@@ -384,16 +384,31 @@ this.overlayAid = {
 	
 	scheduleUnOverlay: function(aWindow, aWith) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
-		if(UNLOADED) { return; }
+		if(UNLOADED) {
+			this.unloadSome(aWindow, aWith);
+			return;
+		}
 		
 		if(!aWindow._OVERLAYS_TO_UNLOAD) {
 			aWindow._OVERLAYS_TO_UNLOAD = [];
 		}
 		aWindow._OVERLAYS_TO_UNLOAD.push(aWith);
 		
-		this.scheduleAll(aWindow);
+		this.overlayAll(aWindow);
 	},
 	
+	unloadSome: function(aWindow, aWith) {
+		var i = this.loadedWindow(aWindow, aWith);
+		if(i !== false) {
+			for(var j = aWindow._OVERLAYS_LOADED.length -1; j > i; j--) {
+				this.removeOverlay(aWindow, j);
+			}
+			
+			this.removeOverlay(aWindow, i);
+			aWindow._RESCHEDULE_OVERLAY = true;
+		}
+	},
+		
 	unloadAll: function(aWindow) {
 		if(aWindow._OVERLAYS_LOADED) {
 			windowOverlays_loop: for(var o=0; o<aWindow._OVERLAYS_LOADED.length; o++) {
@@ -412,6 +427,11 @@ this.overlayAid = {
 			
 			delete aWindow._OVERLAYS_LOADED;
 			delete aWindow._BEING_OVERLAYED;
+			aWindow._RESCHEDULE_OVERLAY = true;
+			observerAid.notify('window-overlayed', aWindow);
+		}
+		
+		if(aWindow._RESCHEDULE_OVERLAY) {
 			observerAid.notify('window-overlayed', aWindow);
 		}
 	},
@@ -700,7 +720,8 @@ this.overlayAid = {
 		delete aWindow._BEING_OVERLAYED;
 		
 		// Re-schedule overlaying the window to load overlays over newly loaded overlays if necessary
-		if(rescheduleOverlay || aWindow._OVERLAYS_TO_UNLOAD) {
+		if(rescheduleOverlay || aWindow._OVERLAYS_TO_UNLOAD || aWindow._RESCHEDULE_OVERLAY) {
+			delete aWindow._RESCHEDULE_OVERLAY;
 			observerAid.notify('window-overlayed', aWindow);
 		}
 		return;
