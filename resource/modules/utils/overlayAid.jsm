@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.4';
+moduleAid.VERSION = '2.1.0';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -56,13 +56,21 @@ this.overlayAid = {
 			onload: onload || null,
 			onunload: onunload || null,
 			document: null,
+			ready: false,
 			persist: {}
 			
 		};
-		var i = this.overlays.push(newOverlay) -1;
+		this.overlays.push(newOverlay);
 		
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
+				// We can't get i from the push before because we can be adding and removing overlays at the same time,
+				// which since this is mostly an asynchronous process, would screw up the counter.
+				for(var i=0; i<overlayAid.overlays.length; i++) {
+					if(overlayAid.overlays[i].uri == aURI && overlayAid.overlays[i].overlay == path) { break; }
+				}
+				if(!overlayAid.overlays[i]) { return; } // this can happen if switch on and off an overlay too quickly I guess..
+				
 				overlayAid.overlays[i].document = xmlhttp.responseXML;
 				
 				if(overlayAid.overlays[i].document.querySelector('parsererror')) {
@@ -71,6 +79,7 @@ this.overlayAid = {
 				}
 				
 				overlayAid.cleanXUL(overlayAid.overlays[i].document, overlayAid.overlays[i]);
+				overlayAid.overlays[i].ready = true;
 				windowMediator.callOnAll(overlayAid.scheduleAll);
 			}
 		});
@@ -103,6 +112,7 @@ this.overlayAid = {
 			onload: onload || null,
 			onunload: onunload || null,
 			document: null,
+			ready: false,
 			loaded: false,
 			remove: false,
 			persist: {}
@@ -111,10 +121,17 @@ this.overlayAid = {
 		if(aWindow._OVERLAYS_LOADED == undefined) {
 			aWindow._OVERLAYS_LOADED = [];
 		}
-		var i = aWindow._OVERLAYS_LOADED.push(newOverlay) -1;
+		aWindow._OVERLAYS_LOADED.push(newOverlay);
 		
 		xmlHttpRequest(path, function(xmlhttp) {
 			if(xmlhttp.readyState === 4) {
+				// We can't get i from the push before because we can be adding and removing overlays at the same time,
+				// which since this is mostly an asynchronous process, would screw up the counter.
+				for(var i=0; i<aWindow._OVERLAYS_LOADED.length; i++) {
+					if(aWindow._OVERLAYS_LOADED[i].uri == path) { break; }
+				}
+				if(!aWindow._OVERLAYS_LOADED[i]) { return; } // this can happen if switch on and off an overlay too quickly I guess..
+				
 				aWindow._OVERLAYS_LOADED[i].document = xmlhttp.responseXML;
 				
 				if(aWindow._OVERLAYS_LOADED[i].document.querySelector('parsererror')) {
@@ -123,6 +140,7 @@ this.overlayAid = {
 				}
 				
 				overlayAid.cleanXUL(aWindow._OVERLAYS_LOADED[i].document, aWindow._OVERLAYS_LOADED[i]);
+				aWindow._OVERLAYS_LOADED[i].ready = true;
 				overlayAid.scheduleAll(aWindow);
 			}
 		});
@@ -340,6 +358,12 @@ this.overlayAid = {
 		}
 	},
 	
+	observingSchedules: function(aSubject, aTopic) {
+		if(UNLOADED) { return; }
+		
+		overlayAid.scheduleAll(aSubject);
+	},
+	
 	scheduleAll: function(aWindow) {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
 		if(UNLOADED) { return; }
@@ -362,25 +386,33 @@ this.overlayAid = {
 		// On shutdown, this could cause errors since we do aSync's here and it wouldn't find the object after it's been removed.
 		if(UNLOADED) { return; }
 		
-		aSync(function() { 
-			if(aWindow) { overlayAid.unOverlayWindow(aWindow, aWith); }
-		});
+		if(!aWindow._OVERLAYS_TO_UNLOAD) {
+			aWindow._OVERLAYS_TO_UNLOAD = [];
+		}
+		aWindow._OVERLAYS_TO_UNLOAD.push(aWith);
+		
+		this.scheduleAll(aWindow);
 	},
 	
 	unloadAll: function(aWindow) {
 		if(aWindow._OVERLAYS_LOADED) {
-			for(var o = aWindow._OVERLAYS_LOADED.length -1; o >= 0; o--) {
-				var isFromHere = false;
-				for(var i = 0; i < overlayAid.overlays.length; i++) {
-					if(aWindow._OVERLAYS_LOADED[o].uri == overlayAid.overlays[i].uri) {
-						isFromHere = true;
-						break;
+			windowOverlays_loop: for(var o=0; o<aWindow._OVERLAYS_LOADED.length; o++) {
+				for(var i=0; i<overlayAid.overlays.length; i++) {
+					if(aWindow._OVERLAYS_LOADED[o].uri == overlayAid.overlays[i].overlay) {
+						// only need to check for the first entry from this array, all subsequent will be unloaded before this one and reloaded afterwards
+						for(var j=aWindow._OVERLAYS_LOADED.length -1; j>o; j--) {
+							overlayAid.removeOverlay(aWindow, j);
+						}
+						overlayAid.removeOverlay(aWindow, o);
+						
+						break windowOverlays_loop;
 					}
 				}
-				overlayAid.unOverlayWindow(aWindow, aWindow._OVERLAYS_LOADED[o].uri, true, isFromHere);
 			}
+			
 			delete aWindow._OVERLAYS_LOADED;
 			delete aWindow._BEING_OVERLAYED;
+			observerAid.notify('window-overlayed', aWindow);
 		}
 	},
 	
@@ -418,51 +450,19 @@ this.overlayAid = {
 		return nodeList;
 	},
 	
-	unOverlayWindow: function(aWindow, aWith, dontSchedule, isFromHere) {
-		if(!dontSchedule && aWindow._BEING_OVERLAYED) {
-			this.scheduleUnOverlay(aWindow, aWith);
-			return;
-		}
-		aWindow._BEING_OVERLAYED = true;
-		
-		if(!isFromHere) {
-			isFromHere = false;
-		}
-		
-		var i = this.loadedWindow(aWindow, aWith);
-		if(i !== false) {
-			for(var j = aWindow._OVERLAYS_LOADED.length -1; j > i; j--) {
-				this.removeOverlay(aWindow, j, !isFromHere);
-			}
-			
-			this.removeOverlay(aWindow, i);
-			
-			if(aWindow._OVERLAYS_LOADED.length == 0) {
-				delete aWindow._OVERLAYS_LOADED;
-			}
-		}
-		
-		if(!dontSchedule) {
-			delete aWindow._BEING_OVERLAYED;
-		}
-		return;
-	},
-	
-	removeOverlay: function(aWindow, i, reschedule) {
-		if(aWindow._OVERLAYS_LOADED[i].onunload) {
-			aWindow._OVERLAYS_LOADED[i].onunload(aWindow);
+	removeOverlay: function(aWindow, i) {
+		if(aWindow._OVERLAYS_LOADED[i].loaded && aWindow._OVERLAYS_LOADED[i].onunload) {
+			try { aWindow._OVERLAYS_LOADED[i].onunload(aWindow); }
+			catch(ex) { Cu.reportError(ex); }
 		}
 		
 		// If the window has been closed, there's no point in regressing all of the DOM changes, only the actual unload scripts may be necessary
 		if(aWindow.closed) {
 			if(!aWindow._OVERLAYS_LOADED[i].document || aWindow._OVERLAYS_LOADED[i].remove) {
 				aWindow._OVERLAYS_LOADED.splice(i, 1);
-			} else if(aWindow._OVERLAYS_LOADED[i].document) {
+			} else {
 				aWindow._OVERLAYS_LOADED[i].loaded = false;
 				aWindow._OVERLAYS_LOADED[i].traceBack = [];
-			}
-			if(reschedule) {
-				this.scheduleAll(aWindow);
 			}
 			return;
 		}
@@ -503,8 +503,22 @@ this.overlayAid = {
 						break;
 						
 					case 'insertBefore':
-						if(action.node && action.originalParent && action.originalPos < action.node.parentNode.childNodes.length) {
-							action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
+						if(action.node && action.originalParent) {
+							if(action.node.parentNode == action.originalParent) {
+								for(var o=0; o<action.originalParent.childNodes.length; o++) {
+									if(action.originalParent.childNodes[o] == action.node) {
+										if(o < action.originalPos) {
+											action.originalPos++;
+										}
+										break;
+									}
+								}
+							}
+							if(action.originalPos < action.node.parentNode.childNodes.length) {
+								action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
+							} else {
+								action.node = action.originalParent.appendChild(action.node);
+							}
 						}
 						break;
 					
@@ -622,46 +636,60 @@ this.overlayAid = {
 		
 		if(!aWindow._OVERLAYS_LOADED[i].document || aWindow._OVERLAYS_LOADED[i].remove) {
 			aWindow._OVERLAYS_LOADED.splice(i, 1);
-		} else if(aWindow._OVERLAYS_LOADED[i].document) {
+		} else {
 			aWindow._OVERLAYS_LOADED[i].loaded = false;
 			aWindow._OVERLAYS_LOADED[i].traceBack = [];
-		}
-		if(reschedule) {
-			this.scheduleAll(aWindow);
 		}
 	},
 	
 	overlayAll: function(aWindow) {
-		if(aWindow._BEING_OVERLAYED) {
-			this.scheduleAll(aWindow);
-			return;
-		}
+		if(aWindow._BEING_OVERLAYED) { return; }
 		aWindow._BEING_OVERLAYED = true;
 		var rescheduleOverlay = false;
 		
 		if(aWindow._OVERLAYS_LOADED == undefined) {
 			aWindow._OVERLAYS_LOADED = [];
+			delete aWindow._OVERLAYS_TO_UNLOAD;
+		}
+			
+		if(aWindow._OVERLAYS_TO_UNLOAD) {
+			while(aWindow._OVERLAYS_TO_UNLOAD.length > 0) {
+				var toUnload = aWindow._OVERLAYS_TO_UNLOAD.shift();
+				var i = this.loadedWindow(aWindow, toUnload);
+				if(i !== false) {
+					for(var j = aWindow._OVERLAYS_LOADED.length -1; j > i; j--) {
+						this.removeOverlay(aWindow, j);
+					}
+					
+					this.removeOverlay(aWindow, i);
+					rescheduleOverlay = true;
+				}
+			}
+			delete aWindow._OVERLAYS_TO_UNLOAD;
 		}
 		
 		for(var i=0; i<aWindow._OVERLAYS_LOADED.length; i++) {
-			if(aWindow._OVERLAYS_LOADED[i].document && !aWindow._OVERLAYS_LOADED[i].loaded) {
+			if(aWindow._OVERLAYS_LOADED[i].ready && !aWindow._OVERLAYS_LOADED[i].loaded) {
 				aWindow._BEING_OVERLAYED = i;
 				this.overlayDocument(aWindow, aWindow._OVERLAYS_LOADED[i]);
 				aWindow._OVERLAYS_LOADED[i].loaded = true;
+				rescheduleOverlay = true;
 			}
 		}
 		
 		for(var i=0; i<this.overlays.length; i++) {
-			if(this.overlays[i].document
+			if(this.overlays[i].ready
 			&& (this.overlays[i].uri == aWindow.document.baseURI || this.loadedWindow(aWindow, this.overlays[i].uri) !== false)
 			&& this.loadedWindow(aWindow, this.overlays[i].overlay) === false) {
 				aWindow._BEING_OVERLAYED = aWindow._OVERLAYS_LOADED.push({
 					uri: this.overlays[i].overlay,
 					traceBack: [],
+					loaded: false,
 					onunload: this.overlays[i].onunload
 				}) -1;
 				
 				this.overlayDocument(aWindow, this.overlays[i]);
+				aWindow._OVERLAYS_LOADED[aWindow._BEING_OVERLAYED].loaded = true;
 				rescheduleOverlay = true;
 			}
 		}
@@ -672,16 +700,16 @@ this.overlayAid = {
 		delete aWindow._BEING_OVERLAYED;
 		
 		// Re-schedule overlaying the window to load overlays over newly loaded overlays if necessary
-		if(rescheduleOverlay) {
-			this.scheduleAll(aWindow);
+		if(rescheduleOverlay || aWindow._OVERLAYS_TO_UNLOAD) {
+			observerAid.notify('window-overlayed', aWindow);
 		}
-		
 		return;
 	},
 	
 	overlayDocument: function(aWindow, overlay) {
 		if(overlay.beforeload) {
-			overlay.beforeload(aWindow);
+			try { overlay.beforeload(aWindow); }
+			catch(ex) { Cu.reportError(ex); }
 		}
 		
 		for(var o = 0; o < overlay.document.childNodes.length; o++) {
@@ -707,7 +735,8 @@ this.overlayAid = {
 		this.persistOverlay(aWindow, overlay);
 		
 		if(overlay.onload) {
-			overlay.onload(aWindow);
+			try { overlay.onload(aWindow); }
+			catch(ex) { Cu.reportError(ex); }
 		}
 	},
 	
@@ -1118,13 +1147,16 @@ this.overlayAid = {
 			node: node,
 			palette: palette
 		});
-	}	
+	}
 };
 
 moduleAid.LOADMODULE = function() {
 	windowMediator.register(overlayAid.scheduleAll, 'domwindowopened');
+	observerAid.add(overlayAid.observingSchedules, 'window-overlayed');
 };
 
 moduleAid.UNLOADMODULE = function() {
+	observerAid.remove(overlayAid.observingSchedules, 'window-overlayed');
+	windowMediator.unregister(overlayAid.scheduleAll, 'domwindowopened');
 	windowMediator.callOnAll(overlayAid.unloadAll);
 };
