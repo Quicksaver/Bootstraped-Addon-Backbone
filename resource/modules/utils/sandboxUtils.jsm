@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.2';
+moduleAid.VERSION = '2.0.3';
 moduleAid.LAZY = true;
 moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
 
@@ -24,7 +24,7 @@ this.__defineGetter__('windowMediator', function() { delete this.windowMediator;
 this.__defineGetter__('observerAid', function() { delete this.observerAid; moduleAid.load('utils/observerAid'); return observerAid; });
 
 // privateBrowsingAid - Private browsing mode listener
-this.__defineGetter__('privateBrowsingAid', function() { delete this.privateBrowsingAid; moduleAid.load('utils/privateBrowsingAid'); return privateBrowsingAid; });
+this.__defineGetter__('privateBrowsingAid', function() { observerAid; delete this.privateBrowsingAid; moduleAid.load('utils/privateBrowsingAid'); return privateBrowsingAid; });
 
 // overlayAid - to use overlays in my bootstraped add-ons
 this.__defineGetter__('overlayAid', function() { windowMediator; observerAid; delete this.overlayAid; moduleAid.load('utils/overlayAid'); return overlayAid; });
