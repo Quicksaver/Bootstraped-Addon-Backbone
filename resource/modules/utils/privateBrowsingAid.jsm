@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // privateBrowsingAid - Private browsing mode listener as on https://developer.mozilla.org/En/Supporting_private_browsing_mode, with a few modifications
@@ -18,15 +18,19 @@ this.privateBrowsingAid = {
 		var watcherObj = aWatcher;
 		if(!watcherObj.observe) {
 			watcherObj.observe = function(aSubject, aTopic, aData) {
-				if(aTopic == "private-browsing") {
-					if(aData == "enter" && this.onEnter) {
-						this.onEnter();
-					} else if(aData == "exit" && this.onExit) {
-						this.onExit();
+				try {
+					if(aTopic == "private-browsing") {
+						if(aData == "enter" && this.onEnter) {
+							this.onEnter();
+						} else if(aData == "exit" && this.onExit) {
+							this.onExit();
+						}
+					} else if(aTopic == "quit-application" && this.onQuit) {
+						this.onQuit();
 					}
-				} else if(aTopic == "quit-application" && this.onQuit) {
-					this.onQuit();
 				}
+				// write errors in the console only after it has been cleared
+				catch(ex) { aSync(function() { Cu.reportError(ex); }); }
 			};
 		}
 		if(!watcherObj.autoStarted) { watcherObj.autoStarted = null; }
@@ -43,7 +47,8 @@ this.privateBrowsingAid = {
 		observerAid.add(watcher, "quit-application");
 		
 		if(this.inPrivateBrowsing && watcher.autoStarted) {
-			watcher.autoStarted();
+			try { watcher.autoStarted(); }
+			catch(ex) { aSync(function() { Cu.reportError(ex); }); }
 		}
 	},
 	
