@@ -21,7 +21,7 @@
 // disable() - disables the add-on
 // The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
 
-let bootstrapVersion = '1.1.0';
+let bootstrapVersion = '1.1.1';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
@@ -43,7 +43,7 @@ function prepareObject(window, aName) {
 	window[objectName] = {
 		objName: objectName,
 		objPathString: objPathString,
-		_sandbox: this,
+		
 		// every supposedly global variable is inaccessible because bootstraped means sandboxed, so I have to reference all these;
 		// it's easier to reference more specific objects from within the modules for better control, only setting these two here because they're more generalized
 		window: window,
@@ -78,7 +78,8 @@ function listenOnce(window, type, handler, capture) {
 	window.addEventListener(type, function runOnce(event) {
 		window.removeEventListener(type, runOnce, capture);
 		if(!UNLOADED) {
-			handler(event, window);
+			try { handler(event, window); }
+			catch(ex) { Cu.reportError(ex); }
 		}
 	}, capture);
 }

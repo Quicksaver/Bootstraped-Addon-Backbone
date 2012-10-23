@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.2';
+moduleAid.VERSION = '2.0.3';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -138,7 +138,7 @@ this.objectWatcher = {
 	},
 	
 	removeAttributeWatcher: function(obj, attr, handler, capture) {
-		if(!obj._propWatchers || typeof(obj._propWatchers.attributes[attr]) == 'undefined') { return false; }
+		if(!obj || !obj._propWatchers || typeof(obj._propWatchers.attributes[attr]) == 'undefined') { return false; }
 		capture = (capture) ? true : false;
 		
 		for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
