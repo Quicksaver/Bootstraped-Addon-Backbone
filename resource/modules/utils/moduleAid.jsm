@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.1.0',
+	version: '2.1.1',
 	modules: [],
 	moduleVars: {},
 	
@@ -108,10 +108,10 @@ this.moduleAid = {
 	
 	unload: function(aModule, force, justVars) {
 		var path = this.preparePath(aModule);
-		if(!path) { return false; }
+		if(!path) { return true; }
 		
 		var i = this.loaded(aModule);
-		if(i === false) { return false; }
+		if(i === false) { return true; }
 		
 		if(!justVars && this.modules[i].unload && (this.modules[i].loaded || force)) {
 			try { this.modules[i].unload(); }
