@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.1';
+moduleAid.VERSION = '2.1.2';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -127,6 +127,7 @@ this.overlayAid = {
 			if(xmlhttp.readyState === 4) {
 				// We can't get i from the push before because we can be adding and removing overlays at the same time,
 				// which since this is mostly an asynchronous process, would screw up the counter.
+				if(!aWindow._OVERLAYS_LOADED) { return; } // just a failsafe, this shouldn't happen if everything is properly built
 				for(var i=0; i<aWindow._OVERLAYS_LOADED.length; i++) {
 					if(aWindow._OVERLAYS_LOADED[i].uri == path) { break; }
 				}
