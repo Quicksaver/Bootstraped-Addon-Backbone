@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.2';
+moduleAid.VERSION = '2.1.3';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -313,7 +313,8 @@ this.overlayAid = {
 						&& node.nodeName == 'toolbar'
 						&& node.getAttribute('customizable') == 'true'
 						&& node.getAttribute('toolboxid')
-						&& aWindow.document.getElementById(node.getAttribute('toolboxid'))) {
+						&& aWindow.document.getElementById(node.getAttribute('toolboxid'))
+						&& (this.tracedAction(aWindow, 'appendChild', node) || this.tracedAction(aWindow, 'insertBefore', node))) {
 							aWindow.document.persist(id, 'currentset');
 							
 							var palette = aWindow.document.getElementById(node.getAttribute('toolboxid')).palette;
@@ -447,6 +448,20 @@ this.overlayAid = {
 		} else {
 			aWindow._OVERLAYS_LOADED[aWindow._BEING_OVERLAYED].traceBack.unshift(traceback);
 		}
+	},
+	
+	tracedAction: function(aWindow, action, node) {
+		var i = aWindow._BEING_OVERLAYED;
+		
+		for(var j = aWindow._OVERLAYS_LOADED[i].traceBack.length -1; j >= 0; j--) {
+			if(aWindow._OVERLAYS_LOADED[i].traceBack[j].action == action) {
+				var compareNode = aWindow._OVERLAYS_LOADED[i].traceBack[j].node || aWindow.document.getElementById(aWindow._OVERLAYS_LOADED[i].traceBack[j].nodeID);
+				if(isAncestor(node, compareNode)) {
+					return true;
+				}
+			}
+		}
+		return false;
 	},
 	
 	updateOverlayedNodes: function(aWindow, node, nodeList) {
@@ -889,6 +904,42 @@ this.overlayAid = {
 	},
 	
 	moveAround: function(aWindow, node, overlayNode, parent) {
+		if(parent.nodeName == 'toolbar' && parent.getAttribute('currentset')) {
+			var currentset = parent.getAttribute('currentset').split(',');
+			for(var c = 0; c < currentset.length; c++) {
+				if(currentset[c] == node.id) {
+					var shift = 0;
+					var beforeEl = null;
+					for(var s = c+1; s < currentset.length; s++) {
+						if(currentset[s] == 'separator' || currentset[s] == 'spring' || currentset[s] == 'spacer') {
+							shift++;
+							continue;
+						}
+						
+						beforeEl = aWindow.document.getElementById(currentset[s]);
+						if(beforeEl) {
+							while(shift > 0 && beforeEl.previousSibling) {
+								if(beforeEl.previousSibling.nodeName != 'toolbarseparator'
+								&& beforeEl.previousSibling.nodeName != 'toolbarspring'
+								&& beforeEl.previousSibling.nodeName != 'toolbarspacer') {
+									break;
+								}
+								beforeEl = beforeEl.previousSibling;
+								shift--;
+							}
+							break;
+						}
+					}
+					
+					if(beforeEl) {
+						return this.insertBefore(aWindow, node, parent, beforeEl);
+					} else {
+						return this.appendChild(aWindow, node, parent);
+					}
+				}
+			}
+		}
+		
 		if(overlayNode.getAttribute('insertafter')) {
 			var idList = overlayNode.getAttribute('insertafter').split(',');
 			for(var i = 0; i < idList.length; i++) {
@@ -921,7 +972,7 @@ this.overlayAid = {
 		
 		if(overlayNode.getAttribute('position')) {
 			var position = parseInt(overlayNode.getAttribute('position')) -1; // one-based children list
-			var sibling = (sibling < parent.childNodes.length) ? node.parentNode.childNodes[position] : null;
+			var sibling = (position < parent.childNodes.length) ? parent.childNodes[position] : null;
 			return this.insertBefore(aWindow, node, parent, sibling);
 		}
 		
@@ -1130,9 +1181,9 @@ this.overlayAid = {
 							var beforeEl = aWindow.document.getElementById(currentset[i]);
 							if(beforeEl) {
 								while(shift > 0 && beforeEl.previousSibling) {
-									if(beforeEl.previousSibling != 'separator'
-									&& beforeEl.previousSibling != 'spring'
-									&& beforeEl.previousSibling != 'spacer') {
+									if(beforeEl.previousSibling.nodeName != 'toolbarseparator'
+									&& beforeEl.previousSibling.nodeName != 'toolbarspring'
+									&& beforeEl.previousSibling.nodeName != 'toolbarspacer') {
 										break;
 									}
 									beforeEl = beforeEl.previousSibling;
