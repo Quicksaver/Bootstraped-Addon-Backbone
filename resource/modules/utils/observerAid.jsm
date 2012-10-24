@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // observerAid - Helper for adding and removing observers
@@ -85,6 +85,8 @@ this.observerAid = {
 moduleAid.LOADMODULE = function() {
 	// This is so the observers aren't called twice on quitting sometimes
 	observerAid.add(function() { observerAid.hasQuit = true; }, 'quit-application');
+	
+	observerLOADED = true;
 };
 
 moduleAid.UNLOADMODULE = function() {

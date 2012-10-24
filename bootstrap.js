@@ -21,10 +21,11 @@
 // disable() - disables the add-on
 // The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
 
-let bootstrapVersion = '1.1.1';
+let bootstrapVersion = '1.1.2';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
+let observerLOADED = false;
 
 const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
 Cu.import("resource://gre/modules/AddonManager.jsm");
@@ -144,9 +145,10 @@ function startup(aData, aReason) {
 
 function shutdown(aData, aReason) {
 	UNLOADED = aReason;
-	observerAid.callQuits();
 	
-	if(aReason == APP_SHUTDOWN) { return; }
+	if(aReason == APP_SHUTDOWN) {
+		if(observerLOADED) { observerAid.callQuits(); }
+		return; }
 	
 	if(STARTED) {
 		onShutdown(aReason);
