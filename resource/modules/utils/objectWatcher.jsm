@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.0';
+moduleAid.VERSION = '2.1.1';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -260,10 +260,7 @@ this.objectWatcher = {
 			var muts = obj._propWatchers.mutations;
 			obj._propWatchers.mutations = [];
 			
-			var attrList = [];
 			for(var attr in obj._propWatchers.attributes) {
-				attrList.push(attr);
-				
 				var changes = 0;
 				var oldValue = false;
 				var newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
@@ -274,7 +271,7 @@ this.objectWatcher = {
 					newValue = false;
 					for(var n=m+1; n<muts.length; n++) {
 						if(muts[n].attributeName == attr) {
-							newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+							newValue = typeof(muts[n].realOldValue) != 'undefined' ? muts[n].realOldValue : muts[n].oldValue;
 							break;
 						}
 					}
@@ -323,7 +320,7 @@ this.objectWatcher = {
 						newValue = false;
 						for(var n=m+1; n<muts.length; n++) {
 							if(muts[n].attributeName == attr) {
-								newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+								newValue = typeof(muts[n].realOldValue) != 'undefined' ? muts[n].realOldValue : muts[n].oldValue;
 								break;
 							}
 						}
