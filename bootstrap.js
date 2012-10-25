@@ -21,7 +21,7 @@
 // disable() - disables the add-on
 // The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
 
-let bootstrapVersion = '1.1.2';
+let bootstrapVersion = '1.1.3';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
@@ -33,6 +33,7 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/PlacesUIUtils.jsm");
 XPCOMUtils.defineLazyServiceGetter(Services, "fuel", "@mozilla.org/fuel/application;1", "fuelIApplication");
+XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");
 XPCOMUtils.defineLazyServiceGetter(Services, "privateBrowsing", "@mozilla.org/privatebrowsing;1", "nsIPrivateBrowsingService");
 XPCOMUtils.defineLazyServiceGetter(Services, "stylesheet", "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
 
@@ -148,7 +149,8 @@ function shutdown(aData, aReason) {
 	
 	if(aReason == APP_SHUTDOWN) {
 		if(observerLOADED) { observerAid.callQuits(); }
-		return; }
+		return;
+	}
 	
 	if(STARTED) {
 		onShutdown(aReason);
