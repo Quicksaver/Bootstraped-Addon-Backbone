@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.3';
+moduleAid.VERSION = '2.0.4';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -21,16 +21,16 @@ moduleAid.LAZY = true;
 //	prop - (string) name of the property or attribute being set or changed
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
-// Note: deleting a watched property does not trigger the watchers, so don't do it! Also setting the watchers on an unset property won't work either.
+// Note: deleting a watched property does not trigger the watchers, so don't do it! Set it to undefined instead if you wish to delete it after removing the watchers.
 // DOM Mutation Observers were implemented in Firefox 14
 this.objectWatcher = {
 	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
 	addPropertyWatcher: function(obj, prop, handler, capture) {
-		if(typeof(obj[prop]) == 'undefined' || !this.setWatchers(obj)) { return false; }
+		if(!this.setWatchers(obj)) { return false; }
 		capture = (capture) ? true : false;
 		
 		if(typeof(obj._propWatchers.properties[prop]) == 'undefined') {
-			var tempVal = obj[prop];
+			var tempVal = (typeof(obj[prop]) == 'undefined') ? undefined : obj[prop];
 			// can't watch constants
 			if(!(delete obj[prop])) {
 				this.unsetWatchers(obj);
@@ -97,7 +97,9 @@ this.objectWatcher = {
 				obj._propWatchers.properties[prop].handlers.splice(i, 1);
 				if(obj._propWatchers.properties[prop].handlers.length == 0) {
 					delete obj[prop]; // remove accessors
-					obj[prop] = obj._propWatchers.properties[prop].value;
+					if(obj._propWatchers.properties[prop].value != undefined) {
+						obj[prop] = obj._propWatchers.properties[prop].value;
+					}
 					delete obj._propWatchers.properties[prop];
 				}
 				
@@ -168,54 +170,111 @@ this.objectWatcher = {
 		
 		obj._propWatchers = {
 			setters: 0,
-			properties: {},
-			attributes: {},
-			mutations: [],
-			scheduler: null,
-			reconnect: function() {
-				var attrList = [];
-				for(var a in this.attributes) {
-					attrList.push(a);
-				}
-				if(attrList.length > 0) {
-					var observerProperties = {
-						attributes: true,
-						attributeOldValue: true
-					};
-					observerProperties.attributeFilter = attrList;
-					this.mutationObserver.observe(obj, observerProperties);
-				}
-			},
-			disconnect: function() {
-				this.mutationObserver.disconnect();
-			},
-			scheduleWatchers: function(mutations, observer) {
-				if(obj._propWatchers.schedule) {
-					obj._propWatchers.schedule.cancel();
-					obj._propWatchers.schedule = null;
-				}
+			properties: {}
+		};
+		
+		if(!obj.ownerDocument && !obj.document) { return true; }
+		
+		obj._propWatchers.attributes = {};
+		obj._propWatchers.mutations = [];
+		obj._propWatchers.scheduler = null;
+		obj._propWatchers.reconnect = function() {
+			var attrList = [];
+			for(var a in this.attributes) {
+				attrList.push(a);
+			}
+			if(attrList.length > 0) {
+				var observerProperties = {
+					attributes: true,
+					attributeOldValue: true
+				};
+				observerProperties.attributeFilter = attrList;
+				this.mutationObserver.observe(obj, observerProperties);
+			}
+		};
+		obj._propWatchers.disconnect = function() {
+			this.mutationObserver.disconnect();
+		};
+		obj._propWatchers.scheduleWatchers = function(mutations, observer) {
+			if(obj._propWatchers.schedule) {
+				obj._propWatchers.schedule.cancel();
+				obj._propWatchers.schedule = null;
+			}
+			
+			for(var m=0; m<mutations.length; m++) {
+				obj._propWatchers.mutations.push(mutations[m]);
+			}
+			
+			// the script could become really heavy if it called the main function everytime (width attribute on sidebar and dragging it for instance)
+			// I'm simply following the changes asynchronously; any delays for heavily changed attributes should be handled properly by the actual handlers.
+			obj._propWatchers.schedule = aSync(obj._propWatchers.callAttrWatchers);
+		};
+		obj._propWatchers.callAttrWatchers = function() {
+			obj._propWatchers.disconnect();
+			var muts = obj._propWatchers.mutations;
+			obj._propWatchers.mutations = [];
+			
+			var attrList = [];
+			for(var attr in obj._propWatchers.attributes) {
+				attrList.push(attr);
 				
-				for(var m=0; m<mutations.length; m++) {
-					obj._propWatchers.mutations.push(mutations[m]);
-				}
-				
-				// the script could become really heavy if it called the main function everytime (width attribute on sidebar and dragging it for instance)
-				// I'm simply following the changes asynchronously; any delays for heavily changed attributes should be handled properly by the actual handlers.
-				obj._propWatchers.schedule = aSync(obj._propWatchers.callAttrWatchers);
-			},
-			callAttrWatchers: function() {
-				obj._propWatchers.disconnect();
-				var muts = obj._propWatchers.mutations;
-				obj._propWatchers.mutations = [];
-				
-				var attrList = [];
-				for(var attr in obj._propWatchers.attributes) {
-					attrList.push(attr);
+				var changes = 0;
+				var oldValue = false;
+				var newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
+				captureMutations_loop: for(var m=0; m<muts.length; m++) {
+					if(muts[m].attributeName != attr) { continue; }
 					
-					var changes = 0;
-					var oldValue = false;
-					var newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
-					captureMutations_loop: for(var m=0; m<muts.length; m++) {
+					oldValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+					newValue = false;
+					for(var n=m+1; n<muts.length; n++) {
+						if(muts[n].attributeName == attr) {
+							newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
+							break;
+						}
+					}
+					if(newValue === false) {
+						newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
+					}
+					
+					if(oldValue === newValue) {
+						newValue = oldValue;
+						muts.splice(m, 1);
+						m--;
+						continue captureMutations_loop;
+					}
+					
+					for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
+						if(obj._propWatchers.attributes[attr].handlers[h].capture) {
+							var continueHandlers = true;
+							try { continueHandlers = obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
+							catch(ex) { Cu.reportError(ex); }
+							
+							if(continueHandlers === false) {
+								for(var n=m+1; n<muts.length; n++) {
+									if(muts[n].attributeName == attr) {
+										muts[n].realOldValue = oldValue;
+										break;
+									}
+								}
+								newValue = oldValue;
+								muts.splice(m, 1);
+								m--;
+								continue captureMutations_loop;
+							}
+						}
+					}
+					
+					changes++;
+				}
+				
+				if(newValue !== null) {
+					obj.setAttribute(attr, newValue);
+				} else {
+					obj.removeAttribute(attr);
+				}
+				
+				if(changes > 0) {
+					for(var m=0; m<muts.length; m++) {
 						if(muts[m].attributeName != attr) { continue; }
 						
 						oldValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
@@ -230,73 +289,19 @@ this.objectWatcher = {
 							newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
 						}
 						
-						if(oldValue === newValue) {
-							newValue = oldValue;
-							muts.splice(m, 1);
-							m--;
-							continue captureMutations_loop;
-						}
-						
 						for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
-							if(obj._propWatchers.attributes[attr].handlers[h].capture) {
-								var continueHandlers = true;
-								try { continueHandlers = obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
+							if(!obj._propWatchers.attributes[attr].handlers[h].capture) {
+								try { obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
 								catch(ex) { Cu.reportError(ex); }
-								
-								if(continueHandlers === false) {
-									for(var n=m+1; n<muts.length; n++) {
-										if(muts[n].attributeName == attr) {
-											muts[n].realOldValue = oldValue;
-											break;
-										}
-									}
-									newValue = oldValue;
-									muts.splice(m, 1);
-									m--;
-									continue captureMutations_loop;
-								}
-							}
-						}
-						
-						changes++;
-					}
-					
-					if(newValue !== null) {
-						obj.setAttribute(attr, newValue);
-					} else {
-						obj.removeAttribute(attr);
-					}
-					
-					if(changes > 0) {
-						for(var m=0; m<muts.length; m++) {
-							if(muts[m].attributeName != attr) { continue; }
-							
-							oldValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
-							newValue = false;
-							for(var n=m+1; n<muts.length; n++) {
-								if(muts[n].attributeName == attr) {
-									newValue = typeof(muts[m].realOldValue) != 'undefined' ? muts[m].realOldValue : muts[m].oldValue;
-									break;
-								}
-							}
-							if(newValue === false) {
-								newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
-							}
-							
-							for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
-								if(!obj._propWatchers.attributes[attr].handlers[h].capture) {
-									try { obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
-									catch(ex) { Cu.reportError(ex); }
-								}
 							}
 						}
 					}
 				}
-				
-				obj._propWatchers.reconnect();
 			}
+			
+			obj._propWatchers.reconnect();
 		};
-		obj._propWatchers.mutationObserver = new obj.ownerDocument.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers);
+		obj._propWatchers.mutationObserver = (obj.ownerDocument) ? new obj.ownerDocument.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers) : new obj.document.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers);
 		
 		return true;
 	},
@@ -304,7 +309,7 @@ this.objectWatcher = {
 	unsetWatchers: function(obj) {
 		if(typeof(obj) != 'object' || obj === null || !obj._propWatchers || obj._propWatchers.setters > 0) { return false; }
 		
-		obj._propWatchers.disconnect();
+		if(obj._propWatchers.disconnect) { obj._propWatchers.disconnect(); }
 		delete obj._propWatchers;
 		return true;
 	}
