@@ -19,15 +19,15 @@
 //	handler - (function(event, window)) - method to be called when event is triggered
 //	(optional) capture - (bool) capture mode
 // disable() - disables the add-on
-// The add-on expects chrome.manifest files to be loaded automatically, this was implemented in Firefox 10
+// Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
 
-let bootstrapVersion = '1.1.3';
+let bootstrapVersion = '1.1.4';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
 let observerLOADED = false;
 
-const {classes: Cc, interfaces: Ci, utils: Cu} = Components;
+const {classes: Cc, interfaces: Ci, utils: Cu, manager: Cm} = Components;
 Cu.import("resource://gre/modules/AddonManager.jsm");
 Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
@@ -93,6 +93,12 @@ function setDefaults() {
 }
 
 function setResourceHandler() {
+	// chrome.manifest files are loaded automatically in Firefox 10+.
+	// I haven't tested this, got it directly from https://developer.mozilla.org/en-US/docs/XPCOM_Interface_Reference/nsIComponentManager#addBootstrappedManifestLocation()
+	if(Services.vc.compare(Services.appinfo.platformVersion, "10.0") < 0) {
+		Cm.addBootstrappedManifestLocation(addonData.installPath);
+	}
+	
 	let alias = Services.io.newFileURI(addonData.installPath);
 	let resourceURI = (addonData.installPath.isDirectory()) ? alias.spec : 'jar:' + alias.spec + '!/';
 	resourceURI += 'resource/';
@@ -114,6 +120,12 @@ function removeResourceHandler() {
 	
 	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
 	resource.setSubstitution(objPathString, null);
+	
+	// chrome.manifest files are loaded automatically in Firefox 10+.
+	// I haven't tested this, got it directly from https://developer.mozilla.org/en-US/docs/XPCOM_Interface_Reference/nsIComponentManager#addBootstrappedManifestLocation()
+	if(Services.vc.compare(Services.appinfo.platformVersion, "10.0") < 0) {
+		Cm.removeBootstrappedManifestLocation(addonData.installPath);
+	}
 }
 
 function disable() {
