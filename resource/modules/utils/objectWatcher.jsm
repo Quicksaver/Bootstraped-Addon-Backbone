@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.4';
+moduleAid.VERSION = '2.1.0';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -22,7 +22,7 @@ moduleAid.LAZY = true;
 //	oldVal - the current value of prop
 //	newVal - the new value of prop
 // Note: deleting a watched property does not trigger the watchers, so don't do it! Set it to undefined instead if you wish to delete it after removing the watchers.
-// DOM Mutation Observers were implemented in Firefox 14
+// DOM Mutation Observers were implemented in Firefox 14. In previous versions it uses the DOMAttrModified event.
 this.objectWatcher = {
 	// Properties part, works by replacing the get and set accessor methods of a property with custom ones
 	addPropertyWatcher: function(obj, prop, handler, capture) {
@@ -173,9 +173,55 @@ this.objectWatcher = {
 			properties: {}
 		};
 		
-		if(!obj.ownerDocument && !obj.document) { return true; }
+		if(!obj.ownerDocument) { return true; }
 		
 		obj._propWatchers.attributes = {};
+		
+		// For compatibility with Firefox 13- , I probably will remove this bit one day 
+		if(!obj.ownerDocument.defaultView.MutationObserver) {
+			obj._propWatchers.callAttrWatchers = function(e) {
+				for(var attr in obj._propWatchers.attributes) {
+					if(attr == e.attrName) {
+						obj._propWatchers.disconnect();
+						
+						var continueHandlers = true;
+						for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
+							if(obj._propWatchers.attributes[attr].handlers[h].capture) {
+								try { continueHandlers = obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, e.prevValue, e.newValue); }
+								catch(ex) { Cu.reportError(ex); }
+								if(!continueHandlers) {
+									toggleAttribute(obj, attr, e.attrChange != e.ADDITION, e.prevValue);
+									break;
+								}
+							}
+						}
+						
+						if(continueHandlers) {
+							for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
+								if(!obj._propWatchers.attributes[attr].handlers[h].capture) {
+									try { obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, e.prevValue, e.newValue); }
+									catch(ex) { Cu.reportError(ex); }
+								}
+							}
+						}
+						
+						obj._propWatchers.reconnect();
+					}
+				}
+			}
+			
+			obj._propWatchers.reconnect = function() {
+				obj.addEventListener('DOMAttrModified', obj._propWatchers.callAttrWatchers, true);
+			};
+			obj._propWatchers.disconnect = function() {
+				obj.removeEventListener('DOMAttrModified', obj._propWatchers.callAttrWatchers, true);
+			};
+			
+			obj._propWatchers.reconnect();
+			
+			return true;
+		};
+			
 		obj._propWatchers.mutations = [];
 		obj._propWatchers.scheduler = null;
 		obj._propWatchers.reconnect = function() {
@@ -267,11 +313,7 @@ this.objectWatcher = {
 					changes++;
 				}
 				
-				if(newValue !== null) {
-					obj.setAttribute(attr, newValue);
-				} else {
-					obj.removeAttribute(attr);
-				}
+				toggleAttribute(obj, attr, newValue !== null, newValue);
 				
 				if(changes > 0) {
 					for(var m=0; m<muts.length; m++) {
@@ -301,7 +343,7 @@ this.objectWatcher = {
 			
 			obj._propWatchers.reconnect();
 		};
-		obj._propWatchers.mutationObserver = (obj.ownerDocument) ? new obj.ownerDocument.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers) : new obj.document.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers);
+		obj._propWatchers.mutationObserver = new obj.ownerDocument.defaultView.MutationObserver(obj._propWatchers.scheduleWatchers);
 		
 		return true;
 	},
@@ -309,7 +351,7 @@ this.objectWatcher = {
 	unsetWatchers: function(obj) {
 		if(typeof(obj) != 'object' || obj === null || !obj._propWatchers || obj._propWatchers.setters > 0) { return false; }
 		
-		if(obj._propWatchers.disconnect) { obj._propWatchers.disconnect(); }
+		obj._propWatchers.disconnect();
 		delete obj._propWatchers;
 		return true;
 	}
