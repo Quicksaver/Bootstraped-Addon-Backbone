@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.1';
+moduleAid.VERSION = '2.0.2';
 moduleAid.LAZY = true;
 moduleAid.VARSLIST = ['listenerAid', 'timerAid', 'modifyFunction', 'aSync', 'loadWindowTools'];
 
@@ -22,6 +22,7 @@ this.loadWindowTools = function() {
 
 moduleAid.LOADMODULE = function() {
 	listenerAid.add(window, 'unload', function(e) {
+		window.willClose = true; // window.closed is not reliable in some cases
 		removeObject(window, objName);
 	}, false, true);
 };
