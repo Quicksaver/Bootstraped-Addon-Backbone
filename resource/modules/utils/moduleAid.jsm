@@ -19,7 +19,7 @@ this.self = this;
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
 this.moduleAid = {
-	version: '2.1.1',
+	version: '2.1.2',
 	modules: [],
 	moduleVars: {},
 	
@@ -96,7 +96,7 @@ this.moduleAid = {
 					}
 					delete moduleAid.modules[i].aSync;
 					moduleAid.modules[i].loaded = true; 
-				}, 500);
+				}, 250);
 			}
 		}
 		else {
