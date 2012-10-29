@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.1';
+moduleAid.VERSION = '2.1.2';
 moduleAid.LAZY = true;
 
 // xmlHttpRequest(url, callback, method, async) - aid for quickly using the nsIXMLHttpRequest interface
@@ -112,6 +112,20 @@ this.trim = function(str) {
 // closeCustomize() - useful for when you want to close the customize toolbar dialogs for whatever reason
 this.closeCustomize = function() {
 	windowMediator.callOnAll(function(aWindow) { try { aWindow.close(); } catch(ex) {} }, null, "chrome://global/content/customizeToolbar.xul");
+	windowMediator.callOnAll(function(aWindow) {
+		if(!aWindow.gBrowser) { return; }
+		
+		for(var b=0; b<aWindow.gBrowser.browsers.length; b++) {
+			var aBrowser = aWindow.gBrowser.getBrowserAtIndex(b);
+			if(aBrowser.contentDocument.documentURI == "chrome://global/content/customizeToolbar.xul") {
+				for(var t=0; t<aWindow.gBrowser.mTabs.length; t++) {
+					if(aWindow.gBrowser.mTabs[t].linkedBrowser == aBrowser) {
+						try { aWindow.gBrowser.removeTab(aWindow.gBrowser.mTabs[t]); } catch(ex) { Cu.reportError(ex); }
+					}
+				}
+			}
+		}
+	}, 'navigator:browser');
 };
 
 // replaceObjStrings(node) - replace all objName and objPathString references in the node attributes and its children with the proper names
