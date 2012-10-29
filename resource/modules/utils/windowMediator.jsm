@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.1.0';
 moduleAid.LAZY = true;
 
 // windowMediator - Aid object to help with window tasks involving window-mediator and window-watcher
@@ -9,17 +9,16 @@ moduleAid.LAZY = true;
 //	(optional) aType - type of windows to execute aCallback on, defaults to null (all)
 // callOnAll(aCallback, aType, aURI, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
 //	(optional) aURI - (string) when defined, checks the documentURI property against the aURI value and only executes aCallback when true, defaults to null
-//	(optional) beforeComplete - (bool) true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+//	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
 //	see callOnMostRecent()
-// callOnLoad(aWindow, aCallback, aType, aURI) - calls aCallback when load event is fired on that window
-//	aWindow - (xul object) window object to execute aCallback on
-//	see callOnMostRecent() and callOnAll
-// register(aHandler, aTopic) - registers aHandler to be notified of every aTopic
-//	aHandler - (function) handler to be fired
+// register(aHandler, aTopic, aType, aURI, beforeComplete) - registers aHandler to be notified of every aTopic
+//	aHandler - (function(aWindow)) handler to be fired. IMPORTANT: handler does not keep its original scope! Use as if in global sandbox scope, never use 'this' in it.
 //	aTopic - (string) "domwindowopened" or (string) "domwindowclosed"
-// unregister(aHandler, aTopic) - unregisters aHandler from being notified of every aTopic
+//	see callOnMostRecent() and callOnAll()
+// unregister(aHandler, aTopic, aType, aURI, beforeComplete) - unregisters aHandler from being notified of every aTopic
 //	see register()
-// watching(aHandler, aTopic) - returns (int) with corresponding watcher index in watchers[] if aHandler has been registered for aTopic, returns (bool) false otherwise
+// watching(aHandler, aTopic, aType, aURI, beforeComplete) - 	returns (int) with corresponding watcher index in watchers[] if aHandler has been registered for aTopic
+//								returns (bool) false otherwise
 //	see register()
 this.windowMediator = {
 	watchers: [],
@@ -46,47 +45,73 @@ this.windowMediator = {
 				if(window.document.readyState == "complete" || beforeComplete) {
 					aCallback(window);
 				} else {
-					this.callOnLoad(window, aCallback);
+					callOnLoad(window, aCallback);
 				}
 			}
 		}
 	},
 	
-	callOnLoad: function(aWindow, aCallback, aType, aURI) {
-		listenOnce(aWindow, "load", function(event, aWindow) {
-			if(UNLOADED) { return; }
-			
-			if((!aType || aWindow.document.documentElement.getAttribute('windowtype') == aType)
-			&& (!aURI || aWindow.document.documentURI == aURI)) {
-				aCallback(aWindow);
-			}
-		});
-	},
-	
-	register: function(aHandler, aTopic) {
-		if(this.watching(aHandler, aTopic) === false) {
-			this.watchers.push({ handler: aHandler, topic: aTopic });
+	register: function(aHandler, aTopic, aType, aURI, beforeComplete) {
+		if(this.watching(aHandler, aTopic, aType, aURI, beforeComplete) === false) {
+			this.watchers.push({ handler: aHandler, topic: aTopic, type: aType || null, uri: aURI || null, beforeComplete: beforeComplete || false });
 		}
 	},
 	
-	unregister: function(aHandler, aTopic) {
-		var i = this.watching(aHandler, aTopic);
+	unregister: function(aHandler, aTopic, aType, aURI, beforeComplete) {
+		var i = this.watching(aHandler, aTopic, aType, aURI, beforeComplete);
 		if(i !== false) {
 			this.watchers.splice(i, 1);
 		}
 	},
 	
-	callWatchers: function(aSubject, aTopic) {
+	callHandlers: function(aSubject, aTopic, noBefore) {
+		var scheduleOnLoad = false;
 		for(var i = 0; i < windowMediator.watchers.length; i++) {
-			if(windowMediator.watchers[i].topic == aTopic) {
-				windowMediator.watchers[i].handler.call(self, aSubject, aTopic);
+			// windowtype is undefined until the window loads
+			if(!noBefore && aSubject.document.readyState != 'complete' && windowMediator.watchers[i].type) {
+				scheduleOnLoad = true;
+			}
+			
+			if(windowMediator.watchers[i].topic == aTopic
+			&& (!windowMediator.watchers[i].type || aSubject.document.documentElement.getAttribute('windowtype') == windowMediator.watchers[i].type)
+			&& (!windowMediator.watchers[i].uri || aSubject.document.documentURI == windowMediator.watchers[i].uri)) {
+				if(noBefore) {
+					if(!windowMediator.watchers[i].beforeComplete) {
+						windowMediator.watchers[i].handler(aSubject);
+					}
+					continue;
+				}
+				
+				if(aSubject.document.readyState == 'complete' || windowMediator.watchers[i].beforeComplete) {
+					windowMediator.watchers[i].handler(aSubject);
+				}
+			}
+			
+			if(scheduleOnLoad) {
+				callOnLoad(aSubject, windowMediator.callLoadedHandlers, aTopic);
 			}
 		}
 	},
 	
-	watching: function(aHandler, aTopic) {
+	callWatchers: function(aSubject, aTopic) {
+		windowMediator.callHandlers(aSubject, aTopic, false);
+	},
+	
+	callLoadedHandlers: function(aSubject, aTopic) {
+		windowMediator.callHandlers(aSubject, aTopic, true);
+	},
+	
+	watching: function(aHandler, aTopic, aType, aURI, beforeComplete) {
+		var type = aType || null;
+		var uri = aURI || null;
+		var before = beforeComplete || false;
+		
 		for(var i = 0; i < this.watchers.length; i++) {
-			if(this.watchers[i].handler == aHandler && this.watchers[i].topic == aTopic) {
+			if(this.watchers[i].handler == aHandler
+			&& this.watchers[i].topic == aTopic
+			&& this.watchers[i].type == type
+			&& this.watchers[i].uri == uri
+			&& this.watchers[i].beforeComplete == before) {
 				return i;
 			}
 		}

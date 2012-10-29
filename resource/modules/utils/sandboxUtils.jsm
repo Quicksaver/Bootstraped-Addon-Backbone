@@ -1,6 +1,6 @@
-moduleAid.VERSION = '2.0.3';
+moduleAid.VERSION = '2.0.4';
 moduleAid.LAZY = true;
-moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
+moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'browserMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
 
 // Globals - lets me use objects that I can share through all the windows
 this.Globals = {};
@@ -19,6 +19,9 @@ this.__defineGetter__('styleAid', function() { delete this.styleAid; moduleAid.l
 
 // windowMediator - Aid object to help with window tasks involving window-mediator and window-watcher
 this.__defineGetter__('windowMediator', function() { delete this.windowMediator; moduleAid.load('utils/windowMediator'); return windowMediator; });
+
+// browserMediator - Aid object to track and perform tasks on all document browsers across the windows
+this.__defineGetter__('browserMediator', function() { windowMediator; delete this.browserMediator; moduleAid.load('utils/browserMediator'); return browserMediator; });
 
 // observerAid - Helper for adding and removing observers
 this.__defineGetter__('observerAid', function() { delete this.observerAid; moduleAid.load('utils/observerAid'); return observerAid; });

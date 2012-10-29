@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.4';
+moduleAid.VERSION = '2.1.5';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -81,6 +81,7 @@ this.overlayAid = {
 				overlayAid.cleanXUL(overlayAid.overlays[i].document, overlayAid.overlays[i]);
 				overlayAid.overlays[i].ready = true;
 				windowMediator.callOnAll(overlayAid.scheduleAll);
+				browserMediator.callOnAll(overlayAid.scheduleBrowser);
 			}
 		});
 	},
@@ -98,6 +99,9 @@ this.overlayAid = {
 		
 		windowMediator.callOnAll(function(aWindow) {
 			overlayAid.scheduleUnOverlay(aWindow, path);
+		});
+		browserMediator.callOnAll(function(aWindow) {
+			overlayAid.unscheduleBrowser(aWindow, path);
 		});
 	},
 	
@@ -350,6 +354,17 @@ this.overlayAid = {
 									}
 									button = button.nextSibling;
 								}
+								
+								// Fix for TotalToolbar creating a browser palette node as a child of the navigator-toolbox element.
+								button = aWindow.document.getElementById(currentset[c]);
+								if(button && button.parentNode.id == palette.id) {
+									var addButton = button;
+									var updateListButton = this.updateOverlayedNodes(aWindow, addButton);
+									addButton = palette.appendChild(addButton);
+									node.insertItem(addButton.id);
+									this.updateOverlayedNodes(aWindow, addButton, updateListButton);
+									continue currentset_loop;
+								}
 							}
 							
 							this.traceBack(aWindow, { action: 'insertToolbar', node: node, palette: palette });
@@ -371,17 +386,15 @@ this.overlayAid = {
 		if(UNLOADED) { return; }
 		
 		if(aWindow.document.readyState != 'complete') {
-			windowMediator.callOnLoad(aWindow, function() { 
-				aSync(function() { overlayAid.overlayAll(aWindow); });
-			});
+			callOnLoad(aWindow, overlayAid.scheduleAll);
+			return;
 		}
-		else {
-			aSync(function() {
-				// This still happens sometimes I have no idea why
-				if(typeof(overlayAid) == 'undefined') { return; }
-				overlayAid.overlayAll(aWindow);
-			});
-		}
+		
+		aSync(function() {
+			// This still happens sometimes I have no idea why
+			if(typeof(overlayAid) == 'undefined') { return; }
+			overlayAid.overlayAll(aWindow);
+		});
 	},
 	
 	scheduleUnOverlay: function(aWindow, aWith) {
@@ -397,6 +410,16 @@ this.overlayAid = {
 		aWindow._OVERLAYS_TO_UNLOAD.push(aWith);
 		
 		this.overlayAll(aWindow);
+	},
+	
+	scheduleBrowser: function(aWindow) {
+		if(!(aWindow.document instanceof aWindow.XULDocument)) { return; } // at least for now I'm only overlaying xul documents
+		overlayAid.scheduleAll(aWindow);
+	},
+	
+	unscheduleBrowser: function(aWindow, aWith) {
+		if(!(aWindow.document instanceof aWindow.XULDocument)) { return; } // at least for now I'm only overlaying xul documents
+		overlayAid.scheduleUnOverlay(aWindow, aWith);
 	},
 	
 	unloadSome: function(aWindow, aWith) {
@@ -437,6 +460,17 @@ this.overlayAid = {
 		if(aWindow._RESCHEDULE_OVERLAY && !aWindow.closed && !aWindow.willClose) {
 			observerAid.notify('window-overlayed', aWindow);
 		}
+	},
+	
+	unloadBrowser: function(aWindow) {
+		if(!(aWindow.document instanceof aWindow.XULDocument)) { return; } // at least for now I'm only overlaying xul documents
+		overlayAid.unloadAll(aWindow);
+	},
+	
+	closedBrowser: function(aWindow) {
+		if(!(aWindow.document instanceof aWindow.XULDocument)) { return; } // at least for now I'm only overlaying xul documents
+		aWindow.willClose = true;
+		overlayAid.unloadAll(aWindow);
 	},
 	
 	traceBack: function(aWindow, traceback, unshift) {
@@ -816,7 +850,7 @@ this.overlayAid = {
 				for(var a=0; a<toolbox.length; a++) {
 					if(toolbox[a].palette && toolbox[a].palette.id == overlayNode.id) {
 						buttons_loop: for(var e=0; e<overlayNode.childNodes.length; e++) {
-							var button = aWindow.document.importNode(overlayNode.childNodes[e]);
+							var button = aWindow.document.importNode(overlayNode.childNodes[e], true); // Firefox 9- deep argument is mandatory
 							if(button.id) {
 								// change or remove the button on the toolbar if it is found in the document
 								var existButton = aWindow.document.getElementById(button.id);
@@ -895,7 +929,7 @@ this.overlayAid = {
 				this.loadInto(aWindow, overlay.childNodes[i]);
 			}
 			else if(overlayNode.parentNode.nodeName != 'overlay') {
-				var node = aWindow.document.importNode(overlayNode);
+				var node = aWindow.document.importNode(overlayNode, true); // Firefox 9- deep argument is mandatory
 				
 				// Add the node to the correct place
 				node = this.moveAround(aWindow, node, overlayNode, aWindow.document.getElementById(overlayNode.parentNode.id));
@@ -927,6 +961,11 @@ this.overlayAid = {
 						
 						beforeEl = aWindow.document.getElementById(currentset[s]);
 						if(beforeEl) {
+							if(beforeEl.parentNode != parent) {
+								beforeEl = null;
+								continue;
+							}
+							
 							while(shift > 0 && beforeEl.previousSibling) {
 								if(beforeEl.previousSibling.nodeName != 'toolbarseparator'
 								&& beforeEl.previousSibling.nodeName != 'toolbarspring'
@@ -1039,7 +1078,7 @@ this.overlayAid = {
 		}
 		var updateList = this.updateOverlayedNodes(aWindow, node);
 		
-		try { node = parent.insertBefore(node, sibling); } catch(ex) { node = null; }
+		try { node = parent.insertBefore(node, sibling); } catch(ex) { Cu.reportError(ex); return null; }
 		
 		this.updateOverlayedNodes(aWindow, node, updateList);
 		if(!originalParent) {
@@ -1106,7 +1145,7 @@ this.overlayAid = {
 	
 	appendXMLSS: function(aWindow, node) {
 		try {
-			node = aWindow.document.importNode(node);
+			node = aWindow.document.importNode(node, true); // Firefox 9- deep argument is mandatory
 			// these have to come before the actual window element
 			node = aWindow.document.insertBefore(node, aWindow.document.documentElement);
 		} catch(ex) { node = null; }
@@ -1124,7 +1163,7 @@ this.overlayAid = {
 		var prefElements = prefPane.getElementsByTagName('preferences');
 		if(prefElements.length == 0) {
 			try {
-				var prefs = aWindow.document.importNode(node);
+				var prefs = aWindow.document.importNode(node, true); // Firefox 9- deep argument is mandatory
 				prefs = prefPane.appendChild(prefs);
 			} catch(ex) { prefs = null; }
 			this.traceBack(aWindow, {
@@ -1139,7 +1178,7 @@ this.overlayAid = {
 			if(!node.childNodes[p].id) { continue; }
 			
 			try {
-				var pref = aWindow.document.importNode(node.childNodes[p]);
+				var pref = aWindow.document.importNode(node.childNodes[p], true); // Firefox 9- deep argument is mandatory
 				pref = prefs.appendChild(pref);
 			} catch(ex) { pref = null; }
 			this.traceBack(aWindow, {
@@ -1234,11 +1273,20 @@ this.overlayAid = {
 
 moduleAid.LOADMODULE = function() {
 	windowMediator.register(overlayAid.scheduleAll, 'domwindowopened');
+	browserMediator.register(overlayAid.scheduleBrowser, 'pageshow');
+	browserMediator.register(overlayAid.scheduleBrowser, 'SidebarFocused');
+	browserMediator.register(overlayAid.closedBrowser, 'pagehide');
+	browserMediator.unregister(overlayAid.closedBrowser, 'SidebarClosed');
 	observerAid.add(overlayAid.observingSchedules, 'window-overlayed');
 };
 
 moduleAid.UNLOADMODULE = function() {
 	observerAid.remove(overlayAid.observingSchedules, 'window-overlayed');
 	windowMediator.unregister(overlayAid.scheduleAll, 'domwindowopened');
+	browserMediator.unregister(overlayAid.scheduleBrowser, 'pageshow');
+	browserMediator.unregister(overlayAid.scheduleBrowser, 'SidebarFocused');
+	browserMediator.unregister(overlayAid.closedBrowser, 'pagehide');
+	browserMediator.unregister(overlayAid.closedBrowser, 'SidebarClosed');
 	windowMediator.callOnAll(overlayAid.unloadAll);
+	browserMediator.callOnAll(overlayAid.unloadBrowser);
 };

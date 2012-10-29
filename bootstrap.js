@@ -13,15 +13,18 @@
 //	see prepareObject()
 // preparePreferences(window, aName) - loads the preferencesUtils module into that window's object initialized by prepareObject() (if it hasn't yet, it will be initialized)
 //	see prepareObject()
-// listenOnce(window, type, handler, capture) - adds handler to window listening to event type that will be removed after one execution.
-//	window - (xul object) the window object to add the handler to
+// listenOnce(aSubject, type, handler, capture) - adds handler to window listening to event type that will be removed after one execution.
+//	aSubject - (xul object) to add the handler to
 //	type - (string) event type to listen to
-//	handler - (function(event, window)) - method to be called when event is triggered
+//	handler - (function(event, aSubject)) - method to be called when event is triggered
 //	(optional) capture - (bool) capture mode
+// callOnLoad(aSubject, aCallback) - calls aCallback when load event is fired on that window
+//	aSubject - (xul object) to execute aCallback on
+//	aCallback - (function(aSubject)) to be called on aSubject
 // disable() - disables the add-on
 // Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
 
-let bootstrapVersion = '1.1.4';
+let bootstrapVersion = '1.2.0';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
@@ -76,20 +79,25 @@ function preparePreferences(window, aName) {
 	window[objectName].moduleAid.load("utils/preferencesUtils");
 }
 
-function listenOnce(window, type, handler, capture) {
-	window.addEventListener(type, function runOnce(event) {
-		window.removeEventListener(type, runOnce, capture);
+function listenOnce(aSubject, type, handler, capture) {
+	if(!aSubject || !aSubject.addEventListener) { return; }
+	
+	aSubject.addEventListener(type, function runOnce(event) {
+		aSubject.removeEventListener(type, runOnce, capture);
 		if(!UNLOADED) {
-			try { handler(event, window); }
+			try { handler(event, aSubject); }
 			catch(ex) { Cu.reportError(ex); }
 		}
 	}, capture);
 }
 
-function setDefaults() {
-	if(prefList) {
-		prefAid.setDefaults(prefList);
-	}
+function callOnLoad(aSubject, aCallback, arg1) {
+	listenOnce(aSubject, "load", function(event, aSubject) {
+		if(UNLOADED) { return; }
+		
+		try { aCallback(aSubject, arg1); }
+		catch(ex) { Cu.reportError(ex); }
+	}, false);
 }
 
 function setResourceHandler() {
@@ -138,7 +146,7 @@ function continueStartup(aReason) {
 	STARTED = aReason;
 	
 	// set add-on preferences defaults
-	setDefaults();
+	prefAid.setDefaults(prefList);
 	
 	onStartup(aReason);
 }
