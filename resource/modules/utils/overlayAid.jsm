@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.6';
+moduleAid.VERSION = '2.1.7';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -348,7 +348,9 @@ this.overlayAid = {
 										var addButton = button;
 										var updateListButton = this.updateOverlayedNodes(aWindow, addButton);
 										button = button.nextSibling;
-										node.insertItem(addButton.id);
+										// insertItem doesn't seem to be defined until the toolbar becomes visible
+										if(node.insertItem) { node.insertItem(addButton.id); }
+										else { addButton = node.appendChild(addButton); }
 										this.updateOverlayedNodes(aWindow, addButton, updateListButton);
 										continue currentset_loop;
 									}
@@ -361,7 +363,9 @@ this.overlayAid = {
 									var addButton = button;
 									var updateListButton = this.updateOverlayedNodes(aWindow, addButton);
 									addButton = palette.appendChild(addButton);
-									node.insertItem(addButton.id);
+									// insertItem doesn't seem to be defined until the toolbar becomes visible
+									if(node.insertItem) { node.insertItem(addButton.id); }
+									else { addButton = node.appendChild(addButton); }
 									this.updateOverlayedNodes(aWindow, addButton, updateListButton);
 									continue currentset_loop;
 								}
@@ -660,11 +664,15 @@ this.overlayAid = {
 											for(var l=e+1; l<currentset.length; l++) {
 												var beforeEl = aWindow.document.getElementById(currentset[l]);
 												if(beforeEl) {
-													toolbars[a].insertItem(action.node.id, beforeEl);
+													// insertItem doesn't seem to be defined until the toolbar becomes visible
+													if(toolbars[a].insertItem) { toolbars[a].insertItem(action.node.id, beforeEl); }
+													else { action.node = toolbars[a].insertBefore(action.node, beforeEl); }
 													break toolbar_loop;
 												}
 											}
-											toolbars[a].insertItem(action.node.id, null, null, false);
+											// insertItem doesn't seem to be defined until the toolbar becomes visible
+											if(toolbars[a].insertItem) { toolbars[a].insertItem(action.node.id, null, null, false); }
+											else { action.node = toolbars[a].appendChild(action.node); }
 											break toolbar_loop;
 										}
 									}
@@ -1297,11 +1305,15 @@ this.overlayAid = {
 									beforeEl = beforeEl.previousSibling;
 									shift--;
 								}
-								toolbars[a].insertItem(node.id, beforeEl);
+								// insertItem doesn't seem to be defined until the toolbar becomes visible
+								if(toolbars[a].insertItem) { toolbars[a].insertItem(node.id, beforeEl); }
+								else { node = toolbars[a].insertBefore(node, beforeEl); }
 								break toolbar_loop;
 							}
 						}
-						toolbars[a].insertItem(node.id, null, null, false);
+						// insertItem doesn't seem to be defined until the toolbar becomes visible
+						if(toolbars[a].insertItem) { toolbars[a].insertItem(node.id, null, null, false); }
+						else { node = toolbars[a].appendChild(node); }
 						break toolbar_loop;
 					}
 				}
