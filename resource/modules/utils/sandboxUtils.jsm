@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.4';
+moduleAid.VERSION = '2.0.5';
 moduleAid.LAZY = true;
 moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'browserMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
 
@@ -30,7 +30,7 @@ this.__defineGetter__('observerAid', function() { delete this.observerAid; modul
 this.__defineGetter__('privateBrowsingAid', function() { observerAid; delete this.privateBrowsingAid; moduleAid.load('utils/privateBrowsingAid'); return privateBrowsingAid; });
 
 // overlayAid - to use overlays in my bootstraped add-ons
-this.__defineGetter__('overlayAid', function() { windowMediator; observerAid; delete this.overlayAid; moduleAid.load('utils/overlayAid'); return overlayAid; });
+this.__defineGetter__('overlayAid', function() { browserMediator; observerAid; delete this.overlayAid; moduleAid.load('utils/overlayAid'); return overlayAid; });
 
 // stringsAid - use for getting strings out of bundles from .properties locale files
 this.__defineGetter__('stringsAid', function() { delete this.stringsAid; moduleAid.load('utils/stringsAid'); return stringsAid; });

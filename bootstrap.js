@@ -24,11 +24,12 @@
 // disable() - disables the add-on
 // Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
 
-let bootstrapVersion = '1.2.0';
+let bootstrapVersion = '1.2.1';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
 let observerLOADED = false;
+let onceListeners = [];
 
 const {classes: Cc, interfaces: Ci, utils: Cu, manager: Cm} = Components;
 Cu.import("resource://gre/modules/AddonManager.jsm");
@@ -79,16 +80,38 @@ function preparePreferences(window, aName) {
 	window[objectName].moduleAid.load("utils/preferencesUtils");
 }
 
+function removeOnceListener(oncer) {
+	for(var i=0; i<onceListeners.length; i++) {
+		if(!oncer) {
+			if(onceListeners[i].obj) {
+				onceListeners[i].obj.removeEventListener(onceListeners[i].type, onceListeners[i].handler, onceListeners[i].capture);
+			}
+			continue;
+		}
+		
+		if(onceListeners[i].handler == oncer) {
+			if(onceListeners[i].obj) {
+				onceListeners[i].obj.removeEventListener(onceListeners[i].type, onceListeners[i].handler, onceListeners[i].capture);
+			}
+			onceListeners.splice(i, 1);
+			return;
+		}
+	}
+}
+
 function listenOnce(aSubject, type, handler, capture) {
-	if(!aSubject || !aSubject.addEventListener) { return; }
+	if(UNLOADED || !aSubject || !aSubject.addEventListener) { return; }
 	
-	aSubject.addEventListener(type, function runOnce(event) {
-		aSubject.removeEventListener(type, runOnce, capture);
+	var runOnce = function(event) {
+		removeOnceListener(runOnce);
 		if(!UNLOADED) {
 			try { handler(event, aSubject); }
 			catch(ex) { Cu.reportError(ex); }
 		}
-	}, capture);
+	};
+	
+	aSubject.addEventListener(type, runOnce, capture);
+	onceListeners.push({ obj: aSubject, type: type, handler: runOnce, capture: capture});
 }
 
 function callOnLoad(aSubject, aCallback, arg1) {
@@ -169,6 +192,7 @@ function shutdown(aData, aReason) {
 	
 	if(aReason == APP_SHUTDOWN) {
 		if(observerLOADED) { observerAid.callQuits(); }
+		removeOnceListener();
 		return;
 	}
 	
@@ -178,6 +202,7 @@ function shutdown(aData, aReason) {
 	
 	// remove resource://
 	removeResourceHandler();
+	removeOnceListener();
 }
 
 function install() {}

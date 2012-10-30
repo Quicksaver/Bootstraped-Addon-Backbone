@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.0';
+moduleAid.VERSION = '2.0.1';
 moduleAid.LAZY = true;
 
 // browserMediator - Aid object to track and perform tasks on all document browsers across the windows
@@ -28,7 +28,7 @@ this.browserMediator = {
 					if(!aURI || aBrowser.contentDocument.documentURI == aURI) {
 						if(aBrowser.contentDocument.readyState == "complete" || beforeComplete) {
 							aCallback(aBrowser.contentWindow);
-						} else {
+						} else if(!UNLOADED) {
 							callOnLoad(aBrowser.contentWindow, aCallback);
 						}
 					}
@@ -40,7 +40,7 @@ this.browserMediator = {
 				&& (!aURI || aWindow.document.getElementById('sidebar').contentDocument.documentURI == aURI)) {
 					if(aWindow.document.getElementById('sidebar').contentDocument.readyState == "complete" || beforeComplete) {
 						aCallback(aWindow.document.getElementById('sidebar').contentWindow);
-					} else {
+					} else if(!UNLOADED) {
 						callOnLoad(aWindow.document.getElementById('sidebar').contentWindow, aCallback);
 					}
 				}
@@ -51,7 +51,7 @@ this.browserMediator = {
 				&& (!aURI || aWindow.document.getElementById('sidebar-twin').contentDocument.documentURI == aURI)) {
 					if(aWindow.document.getElementById('sidebar-twin').contentDocument.readyState == "complete" || beforeComplete) {
 						aCallback(aWindow.document.getElementById('sidebar-twin').contentWindow);
-					} else {
+					} else if(!UNLOADED) {
 						callOnLoad(aWindow.document.getElementById('sidebar-twin').contentWindow, aCallback);
 					}
 				}
@@ -151,13 +151,13 @@ this.browserMediator = {
 
 moduleAid.LOADMODULE = function() {
 	windowMediator.callOnAll(browserMediator.prepareWindow, 'navigator:browser');
-	windowMediator.register(browserMediator.prepareWindow, 'domwindowopened');
-	windowMediator.register(browserMediator.forgetWindow, 'domwindowclosed');
+	windowMediator.register(browserMediator.prepareWindow, 'domwindowopened', 'navigator:browser');
+	windowMediator.register(browserMediator.forgetWindow, 'domwindowclosed', 'navigator:browser');
 };
 
 moduleAid.UNLOADMODULE = function() {
-	windowMediator.unregister(browserMediator.prepareWindow, 'domwindowopened');
-	windowMediator.unregister(browserMediator.forgetWindow, 'domwindowclosed');
+	windowMediator.unregister(browserMediator.prepareWindow, 'domwindowopened', 'navigator:browser');
+	windowMediator.unregister(browserMediator.forgetWindow, 'domwindowclosed', 'navigator:browser');
 	windowMediator.callOnAll(browserMediator.forgetWindow, 'navigator:browser', null, true);
 };
 function doLog(str) {

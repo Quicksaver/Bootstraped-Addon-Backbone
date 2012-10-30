@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.0';
+moduleAid.VERSION = '2.1.1';
 moduleAid.LAZY = true;
 
 // windowMediator - Aid object to help with window tasks involving window-mediator and window-watcher
@@ -44,7 +44,7 @@ this.windowMediator = {
 			if(!aURI || window.document.documentURI == aURI) {
 				if(window.document.readyState == "complete" || beforeComplete) {
 					aCallback(window);
-				} else {
+				} else if(!UNLOADED) {
 					callOnLoad(window, aCallback);
 				}
 			}
