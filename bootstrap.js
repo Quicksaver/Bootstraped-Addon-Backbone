@@ -24,7 +24,7 @@
 // disable() - disables the add-on
 // Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
 
-let bootstrapVersion = '1.2.1';
+let bootstrapVersion = '1.2.2';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
@@ -83,19 +83,18 @@ function preparePreferences(window, aName) {
 function removeOnceListener(oncer) {
 	for(var i=0; i<onceListeners.length; i++) {
 		if(!oncer) {
-			if(onceListeners[i].obj) {
-				onceListeners[i].obj.removeEventListener(onceListeners[i].type, onceListeners[i].handler, onceListeners[i].capture);
-			}
+			onceListeners[i]();
 			continue;
 		}
 		
-		if(onceListeners[i].handler == oncer) {
-			if(onceListeners[i].obj) {
-				onceListeners[i].obj.removeEventListener(onceListeners[i].type, onceListeners[i].handler, onceListeners[i].capture);
-			}
+		if(onceListeners[i] == oncer) {
 			onceListeners.splice(i, 1);
 			return;
 		}
+	}
+	
+	if(!oncer) {
+		onceListeners = [];
 	}
 }
 
@@ -103,15 +102,16 @@ function listenOnce(aSubject, type, handler, capture) {
 	if(UNLOADED || !aSubject || !aSubject.addEventListener) { return; }
 	
 	var runOnce = function(event) {
-		removeOnceListener(runOnce);
-		if(!UNLOADED) {
+		aSubject.removeEventListener(type, runOnce, capture);
+		if(!UNLOADED && event !== undefined) {
+			removeOnceListener(runOnce);
 			try { handler(event, aSubject); }
 			catch(ex) { Cu.reportError(ex); }
 		}
 	};
 	
 	aSubject.addEventListener(type, runOnce, capture);
-	onceListeners.push({ obj: aSubject, type: type, handler: runOnce, capture: capture});
+	onceListeners.push(runOnce);
 }
 
 function callOnLoad(aSubject, aCallback, arg1) {
