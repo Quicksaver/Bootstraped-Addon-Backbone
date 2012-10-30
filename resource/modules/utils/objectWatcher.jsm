@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.1';
+moduleAid.VERSION = '2.1.2';
 moduleAid.LAZY = true;
 
 // objectWatcher - This acts as a replacement for the event DOM Attribute Modified, works for both attributes and object properties
@@ -9,12 +9,15 @@ moduleAid.LAZY = true;
 //		(optional) capture - when (bool) true it cancels setting the property if handler returns (bool) false, defaults to (bool) false
 //	removePropertyWatcher(obj, prop, handler, capture) - unregisters handler as a watcher for prop changes
 //		see addPropertyWatcher()
-//	addAttributeWatcher(obj, attr, handler, capture) - registers handler as a watcher for object attribute attr changes
+//	addAttributeWatcher(obj, attr, handler, capture, iterateAll) - registers handler as a watcher for object attribute attr changes
 //		obj - (xul element or object) to watch for changes
 //		attr - (string) attribute name in obj to watch
 //		handler - (function) method to fire when attr is set, removed or changed
 //		(optional) capture - when (bool) true it cancels setting the attribute if handler returns (bool) false, defaults to (bool) false
-//	removeAttributeWatcher(obj, attr, handler, capture) - unregisters handler as a watcher for object attribute attr changes
+//		(optional) iterateAll -	when (bool) false only triggers handler for the last change in the attribute, merging all the changes queued in between.
+//					when (bool) true triggers handler for every attribute change in the queue. Defaults to (bool) true.
+//					will always act as (bool) true if capture is (bool) true or if on Firefox 13- .
+//	removeAttributeWatcher(obj, attr, handler, capture, iterateAll) - unregisters handler as a watcher for object attribute attr changes
 //		see addAttributeWatcher()
 // All handlers expect function(obj, prop, oldVal, newVal), where:
 //	obj - (xul element or object) where the change occured
@@ -113,45 +116,42 @@ this.objectWatcher = {
 	},
 	
 	// Attributes part, works through delayed DOM Mutation Observers
-	addAttributeWatcher: function(obj, attr, handler, capture) {
+	addAttributeWatcher: function(obj, attr, handler, capture, iterateAll) {
 		if(!this.setWatchers(obj)) { return false; }
 		capture = (capture) ? true : false;
+		iterateAll = (capture || iterateAll) ? true : false;
 		
 		if(typeof(obj._propWatchers.attributes[attr]) == 'undefined') {
 			obj._propWatchers.disconnect();
-			
-			obj._propWatchers.attributes[attr] = {
-				value: (obj.hasAttribute(attr)) ? obj.getAttribute(attr) : null,
-				handlers: []
-			};
-			
+			obj._propWatchers.attributes[attr] = [];
 			obj._propWatchers.reconnect();
 		}
 		else {
-			for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
-				if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
-				&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) { return true; }
+			for(var i=0; i<obj._propWatchers.attributes[attr].length; i++) {
+				if(compareFunction(obj._propWatchers.attributes[attr][i].handler, handler)
+				&& capture == obj._propWatchers.attributes[attr][i].capture
+				&& iterateAll == obj._propWatchers.attributes[attr][i].iterateAll) { return true; }
 			}
 		}
 		
-		obj._propWatchers.attributes[attr].handlers.push({ handler: handler, capture: capture });
+		obj._propWatchers.attributes[attr].push({ handler: handler, capture: capture, iterateAll: iterateAll });
 		obj._propWatchers.setters++;
 		return true;
 	},
 	
-	removeAttributeWatcher: function(obj, attr, handler, capture) {
+	removeAttributeWatcher: function(obj, attr, handler, capture, iterateAll) {
 		if(!obj || !obj._propWatchers || typeof(obj._propWatchers.attributes[attr]) == 'undefined') { return false; }
 		capture = (capture) ? true : false;
+		iterateAll = (capture || iterateAll) ? true : false;
 		
-		for(var i=0; i<obj._propWatchers.attributes[attr].handlers.length; i++) {
-			if(compareFunction(obj._propWatchers.attributes[attr].handlers[i].handler, handler)
-			&& capture == obj._propWatchers.attributes[attr].handlers[i].capture) {
-				obj._propWatchers.attributes[attr].handlers.splice(i, 1);
-				if(obj._propWatchers.attributes[attr].handlers.length == 0) {
+		for(var i=0; i<obj._propWatchers.attributes[attr].length; i++) {
+			if(compareFunction(obj._propWatchers.attributes[attr][i].handler, handler)
+			&& capture == obj._propWatchers.attributes[attr][i].capture
+			&& iterateAll == obj._propWatchers.attributes[attr][i].iterateAll) {
+				obj._propWatchers.attributes[attr].splice(i, 1);
+				if(obj._propWatchers.attributes[attr].length == 0) {
 					obj._propWatchers.disconnect();
-					
 					delete obj._propWatchers.attributes[attr];
-					
 					obj._propWatchers.reconnect();
 				}
 				
@@ -208,7 +208,7 @@ this.objectWatcher = {
 						obj._propWatchers.reconnect();
 					}
 				}
-			}
+			};
 			
 			obj._propWatchers.reconnect = function() {
 				obj.addEventListener('DOMAttrModified', obj._propWatchers.callAttrWatchers, true);
@@ -286,10 +286,10 @@ this.objectWatcher = {
 						continue captureMutations_loop;
 					}
 					
-					for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
-						if(obj._propWatchers.attributes[attr].handlers[h].capture) {
+					for(var h=0; h<obj._propWatchers.attributes[attr].length; h++) {
+						if(obj._propWatchers.attributes[attr][h].capture) {
 							var continueHandlers = true;
-							try { continueHandlers = obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
+							try { continueHandlers = obj._propWatchers.attributes[attr][h].handler(obj, attr, oldValue, newValue); }
 							catch(ex) { Cu.reportError(ex); }
 							
 							if(continueHandlers === false) {
@@ -313,6 +313,7 @@ this.objectWatcher = {
 				toggleAttribute(obj, attr, newValue !== null, newValue);
 				
 				if(changes > 0) {
+					var firstOldValue = typeof(muts[0].realOldValue) != 'undefined' ? muts[0].realOldValue : muts[0].oldValue;
 					for(var m=0; m<muts.length; m++) {
 						if(muts[m].attributeName != attr) { continue; }
 						
@@ -328,10 +329,16 @@ this.objectWatcher = {
 							newValue = obj.hasAttribute(attr) ? obj.getAttribute(attr) : null;
 						}
 						
-						for(var h=0; h<obj._propWatchers.attributes[attr].handlers.length; h++) {
-							if(!obj._propWatchers.attributes[attr].handlers[h].capture) {
-								try { obj._propWatchers.attributes[attr].handlers[h].handler(obj, attr, oldValue, newValue); }
-								catch(ex) { Cu.reportError(ex); }
+						for(var h=0; h<obj._propWatchers.attributes[attr].length; h++) {
+							if(!obj._propWatchers.attributes[attr][h].capture) {
+								if(obj._propWatchers.attributes[attr][h].iterateAll) {
+									try { obj._propWatchers.attributes[attr][h].handler(obj, attr, oldValue, newValue); }
+									catch(ex) { Cu.reportError(ex); }
+								}
+								else if(m == muts.length -1) {
+									try { obj._propWatchers.attributes[attr][h].handler(obj, attr, firstOldValue, newValue); }
+									catch(ex) { Cu.reportError(ex); }
+								}
 							}
 						}
 					}
