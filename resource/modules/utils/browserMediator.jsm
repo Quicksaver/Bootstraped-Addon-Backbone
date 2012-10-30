@@ -160,7 +160,3 @@ moduleAid.UNLOADMODULE = function() {
 	windowMediator.unregister(browserMediator.forgetWindow, 'domwindowclosed', 'navigator:browser');
 	windowMediator.callOnAll(browserMediator.forgetWindow, 'navigator:browser', null, true);
 };
-function doLog(str) {
-	if(!str) { str = 'false string'; }
-	Services.console.logStringMessage(str);
-}
