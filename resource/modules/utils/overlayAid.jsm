@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.1.5';
+moduleAid.VERSION = '2.1.6';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -691,6 +691,23 @@ this.overlayAid = {
 							}
 						}
 						break;
+					
+					case 'addToolbar':
+						if(action.node && action.toolboxid) {
+							var toolbox = aWindow.document.getElementById(action.toolboxid);
+							if(toolbox) {
+								for(var et=0; et<toolbox.externalToolbars.length; et++) {
+									if(toolbox.externalToolbars[et] == action.node) {
+										toolbox.externalToolbars.splice(et, 1);
+										break;
+									}
+								}
+							}
+						}
+						break;
+					
+					case 'removeToolbar': // These should be automatically added to the toolbox array if necessary
+						break;
 								
 					default: break;
 				}
@@ -907,6 +924,9 @@ this.overlayAid = {
 				
 				// If removeelement attribute is true, remove the element and do nothing else
 				if(overlayNode.getAttribute('removeelement') == 'true') {
+					// Check if we are removing any sidebars so we also remove it from the toolbox
+					this.removeToolbars(aWindow, node);
+					
 					this.removeChild(aWindow, node);
 					continue;
 				}
@@ -931,6 +951,9 @@ this.overlayAid = {
 			else if(overlayNode.parentNode.nodeName != 'overlay') {
 				var node = aWindow.document.importNode(overlayNode, true); // Firefox 9- deep argument is mandatory
 				
+				// Check if we are adding any sidebars so we remove it later from the toolbox
+				this.addToolbars(aWindow, node);
+				
 				// Add the node to the correct place
 				node = this.moveAround(aWindow, node, overlayNode, aWindow.document.getElementById(overlayNode.parentNode.id));
 				
@@ -943,6 +966,43 @@ this.overlayAid = {
 					this.getChildrenOf(aWindow, allGetChildrenOf[gco]);
 				}
 			}
+		}
+	},
+	
+	addToolbars: function(aWindow, node) {
+		if(node.nodeName == 'toolbar' && node.id && node.getAttribute('toolboxid')) {
+			this.traceBack(aWindow, {
+				action: 'addToolbar',
+				node: node,
+				toolboxid: node.getAttribute('toolboxid')
+			});
+		}
+		for(var nc=0; nc<node.childNodes.length; nc++) {
+			this.addToolbars(aWindow, node.childNodes[nc]);
+		}
+	},
+	
+	removeToolbars: function(aWindow, node) {
+		if(node.nodeName == 'toolbar' && node.id && node.getAttribute('toolboxid')) {
+			this.traceBack(aWindow, {
+				action: 'removeToolbar',
+				node: node,
+				toolboxid: node.getAttribute('toolboxid')
+			});
+			
+			var toolbox = aWindow.document.getElementById(node.getAttribute('toolboxid'));
+			if(toolbox) {
+				for(var et=0; et<toolbox.externalToolbars.length; et++) {
+					if(toolbox.externalToolbars[et] == node) {
+						toolbox.externalToolbars.splice(et, 1);
+						break;
+					}
+				}
+			}
+		}
+		
+		for(var nc=0; nc<node.childNodes.length; nc++) {
+			this.removeToolbars(aWindow, node.childNodes[nc]);
 		}
 	},
 	
