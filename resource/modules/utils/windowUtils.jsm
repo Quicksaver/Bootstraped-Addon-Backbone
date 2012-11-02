@@ -1,6 +1,5 @@
-moduleAid.VERSION = '2.0.2';
+moduleAid.VERSION = '2.0.3';
 moduleAid.LAZY = true;
-moduleAid.VARSLIST = ['listenerAid', 'timerAid', 'modifyFunction', 'aSync', 'loadWindowTools'];
 
 // listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
 this.__defineGetter__('listenerAid', function() { delete this.listenerAid; moduleAid.load('utils/listenerAid'); return listenerAid; });

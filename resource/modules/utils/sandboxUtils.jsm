@@ -1,9 +1,5 @@
-moduleAid.VERSION = '2.0.5';
+moduleAid.VERSION = '2.0.6';
 moduleAid.LAZY = true;
-moduleAid.VARSLIST = ['Globals', 'window', 'document', 'prefAid', 'styleAid', 'windowMediator', 'browserMediator', 'observerAid', 'privateBrowsingAid', 'overlayAid', 'stringsAid', 'objectWatcher', 'xmlHttpRequest', 'aSync', 'dispatch', 'compareFunction', 'isAncestor', 'hideIt', 'trim', 'closeCustomize', 'replaceObjString', 'setAttribute', 'removeAttribute', 'toggleAttribute', 'loadSandboxTools', 'loadAttributesTools'];
-
-// Globals - lets me use objects that I can share through all the windows
-this.Globals = {};
 
 // window - Similarly to windowMediator.callOnMostRecent, the window property returns the most recent navigator:browser window object
 this.__defineGetter__('window', function() { return Services.wm.getMostRecentWindow('navigator:browser'); });

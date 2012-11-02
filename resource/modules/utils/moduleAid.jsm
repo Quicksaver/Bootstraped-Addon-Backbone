@@ -15,11 +15,12 @@ this.self = this;
 //	see load()
 // subscript modules are run in the context of self, all objects should be set using this.whateverObject so they can be deleted on unload, moduleAid optionally expects these:
 //	moduleAid.VERSION - (string) module version
-//	moduleAid.VARSLIST - (array) list with all the objects the module inserts into the object when loaded, for easy unloading
+//	moduleAid.VARSLIST - (array) list with all the objects the module inserts into the object when loaded, for easy unloading. If not set, it will be automatically compiled.
 //	moduleAid.LOADMODULE - (function) to be executed on module loading
 //	moduleAid.UNLOADMODULE - (function) to be executed on module unloading
+//	moduleAid.LAZY - (bool) vital modules that should be the last ones to be unloaded (like the utils) should have this set to true
 this.moduleAid = {
-	version: '2.1.2',
+	version: '2.2.0',
 	modules: [],
 	moduleVars: {},
 	
@@ -65,6 +66,32 @@ this.moduleAid = {
 		delete this.UNLOADMODULE;
 		delete this.VERSION;
 		delete this.LAZY;
+		
+		if(!this.modules[i].vars) {
+			if(!Globals.moduleCache[aModule]) {
+				var tempScope = {
+					moduleAid: {},
+					$: function(a) { return null; },
+					$$: function(a) { return null; }
+				};
+				try { Services.scriptloader.loadSubScript(path, tempScope); }
+				catch(ex) {
+					Cu.reportError(ex);
+					return false;
+				}
+				delete tempScope.moduleAid;
+				delete tempScope.$;
+				delete tempScope.$$;
+				
+				var scopeVars = [];
+				for(var v in tempScope) {
+					scopeVars.push(v);
+				}
+				Globals.moduleCache[aModule] = { vars: scopeVars };
+				delete tempScope;
+			}
+			this.modules[i].vars = Globals.moduleCache[aModule].vars;
+		}
 		
 		try { this.createVars(this.modules[i].vars); }
 		catch(ex) {
@@ -194,3 +221,5 @@ this.moduleAid = {
 		return "resource://"+objPathString+"/modules/"+aModule+".jsm";
 	}
 };
+
+Globals.moduleCache = {};

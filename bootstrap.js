@@ -24,12 +24,15 @@
 // disable() - disables the add-on
 // Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
 
-let bootstrapVersion = '1.2.2';
+let bootstrapVersion = '1.2.3';
 let UNLOADED = false;
 let STARTED = false;
 let addonData = null;
 let observerLOADED = false;
 let onceListeners = [];
+
+// Globals - lets me use objects that I can share through all the windows
+let Globals = {};
 
 const {classes: Cc, interfaces: Ci, utils: Cu, manager: Cm} = Components;
 Cu.import("resource://gre/modules/AddonManager.jsm");
