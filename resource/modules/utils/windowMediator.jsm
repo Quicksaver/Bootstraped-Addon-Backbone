@@ -9,11 +9,14 @@ moduleAid.LAZY = true;
 //	(optional) aType - type of windows to execute aCallback on, defaults to null (all)
 // callOnAll(aCallback, aType, aURI, beforeComplete) - goes through every opened browser window of aType and executes aCallback on it
 //	(optional) aURI - (string) when defined, checks the documentURI property against the aURI value and only executes aCallback when true, defaults to null
-//	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+//	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false.
 //	see callOnMostRecent()
 // register(aHandler, aTopic, aType, aURI, beforeComplete) - registers aHandler to be notified of every aTopic
 //	aHandler - (function(aWindow)) handler to be fired. IMPORTANT: handler does not keep its original scope! Use as if in global sandbox scope, never use 'this' in it.
 //	aTopic - (string) "domwindowopened" or (string) "domwindowclosed"
+//	(optional) beforeComplete -	See callOnAll()
+//					Note that regardless of this value, if you set aType, no callback will be performed before the window is loaded because the windowtype attribute
+//					won't be loaded yet! In some cases even the URI might not be loaded either so there's no point in setting this at all.
 //	see callOnMostRecent() and callOnAll()
 // unregister(aHandler, aTopic, aType, aURI, beforeComplete) - unregisters aHandler from being notified of every aTopic
 //	see register()

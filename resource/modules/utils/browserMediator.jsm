@@ -5,7 +5,8 @@ moduleAid.LAZY = true;
 // callOnAll(aCallback, aURI, beforeComplete) - goes through every opened browser (tabs and sidebar) and executes aCallback on it
 //	aCallback - (function(aBrowser)) to be called on aBrowser
 //	(optional) aURI - (string) when defined, checks the documentURI property against the aURI value and only executes aCallback when true, defaults to null
-//	(optional) beforeComplete - true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+//	(optional) beforeComplete - 	true calls aCallback immediatelly regardless of readyState, false fires aCallback when window loads if readyState != complete, defaults to false
+//					see notes on windowMediator.register()
 // register(aHandler, aTopic, aURI, beforeComplete) - registers aHandler to be notified of every aTopic
 //	aHandler - (function(aBrowser)) handler to be fired
 //	aTopic - (string) "pageshow" or (string) "pagehide" or (string) "SidebarFocused"
