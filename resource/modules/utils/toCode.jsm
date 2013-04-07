@@ -1,7 +1,8 @@
-moduleAid.VERSION = '1.0.0';
+moduleAid.VERSION = '1.0.1';
 moduleAid.LAZY = true;
 
-// toCode - object that allows me to modify a function quickly from within my scripts, being able to revert afterwards and control for any errors in the process
+// toCode - object that allows me to modify a function quickly from within my scripts, being able to revert afterwards and control for any errors in the process.
+// USE WITH CAUTION! It's not 100% failsafe.
 // Warning: At least for now it doesn't clean up after itself, I have to do this manually in each script unload.
 // Warning: Don't modify twice the same method within the same add-on using more than one declaration to toCode.modify(), it doesn't check for repeated changed functions.
 //	modify(aObj, aName, aArray) - modify the method with the changes included in aArray
@@ -22,25 +23,24 @@ this.toCode = {
 		var fnName = aName.split(".").pop();
 		if(!aObj || typeof(aObj[fnName]) != 'function') { return; }
 		
-		var oldCode = aObj[fnName].toString();
+		var methodCode = aObj[fnName].toString();
 		var newRecord = {
 			name: aName,
-			changes: aArray,
 			original: aObj[fnName],
-			oldCode: oldCode,
-			newCode: oldCode
+			oldCode: methodCode
 		};
 		
 		for(var i=0; i < aArray.length; i++) {
-			if(newRecord.newCode.indexOf(aArray[i][0]) < 0) {
+			if(methodCode.indexOf(aArray[i][0]) < 0) {
 				Cu.reportError('Could not find occurence of string '+i+' in '+aName+'! Interrupting modification.');
 				return;
 			}
-			newRecord.newCode = newRecord.newCode.replace(aArray[i][0], aArray[i][1].replace("{([objName])}", objName));
+			methodCode = methodCode.replace(aArray[i][0], aArray[i][1].replace("{([objName])}", objName));
 		}
 		
 		try {
-			aObj[fnName] = eval("("+newRecord.newCode+")");
+			aObj[fnName] = eval("("+methodCode+")");
+			newRecord.newCode = aObj[fnName].toString();
 			this._records.push(newRecord);
 		}
 		catch(ex) { Cu.reportError(ex); }
@@ -53,14 +53,9 @@ this.toCode = {
 		for(var i=0; i<this._records.length; i++) {
 			if(this._records[i].name == aName) {
 				// Let's ensure no other add-on further changed this function in the meantime.
-				// If something doesn't match we'll report it to the error console, but for lack of a better alternative we'll still replace with our original.
+				// If it doesn't match we'll report to the error console, but for lack of a better alternative we'll still replace with our original.
 				var newCode = aObj[fnName].toString();
-				var checkCode = newCode;
-				for(var c=0; c < this._records[i].changes.length; c++) {
-					checkCode = checkCode.replace(this._records[i].changes[c][1].replace("{([objName])}", objName), this._records[i].changes[c][0]);
-				}
-				
-				if(newCode != this._records[i].newCode || checkCode != this._records[i].oldCode) {
+				if(newCode != this._records[i].newCode) {
 					Cu.reportError('Warning! Method '+aName+' has been further changed! Reverting to saved original.');
 				}
 				
