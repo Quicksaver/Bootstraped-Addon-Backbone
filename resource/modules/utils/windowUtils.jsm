@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.0.4';
+moduleAid.VERSION = '2.0.5';
 moduleAid.LAZY = true;
 
 // listenerAid - Object to aid in setting and removing all kinds of event listeners to an object;
@@ -13,14 +13,13 @@ if(Services.vc.compare(Services.appinfo.platformVersion, "20.0") >= 0) {
 	this.__defineGetter__('privateBrowsingAid', function() { observerAid; delete this.privateBrowsingAid; moduleAid.load('utils/privateBrowsingWindow'); return privateBrowsingAid; });
 }
 
-// modifyFunction() - allows me to modify a function quickly from within my scripts
-this.modifyFunction = function(aOriginal, aArray) { loadWindowTools(); return modifyFunction(aOriginal, aArray); };
+// toCode - allows me to modify a function quickly and safely from within my scripts
+this.__defineGetter__('toCode', function() { delete this.toCode; moduleAid.load('utils/toCode'); return toCode; });
 
 // aSync() - lets me run aFunc asynchronously, basically it's a one shot timer with a delay of aDelay msec
 this.aSync = function(aFunc, aDelay) { loadWindowTools(); return aSync(aFunc, aDelay); };
 
 this.loadWindowTools = function() {
-	delete this.xmlHttpRequest;
 	delete this.aSync;
 	moduleAid.load('utils/windowTools');
 };
