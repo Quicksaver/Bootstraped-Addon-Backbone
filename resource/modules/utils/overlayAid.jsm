@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.6.0';
+moduleAid.VERSION = '2.6.1';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -1598,6 +1598,17 @@ this.overlayAid = {
 						return aNode;
 					},
 					
+					getInToolbar: function(aNode, toolbar) {
+						var walk = aNode;
+						while(walk) {
+							if(walk.tagName == 'toolbar') {
+								return (walk == toolbar);
+							}
+							walk = walk.parentNode;
+						}
+						return false;
+					},
+					
 					disableEntry: function(aNode, entry) {
 						aNode = this.getNode(aNode);
 						entry.disabled = 	!aNode
@@ -1609,14 +1620,14 @@ this.overlayAid = {
 					
 					hideOnSelf: function(aNode, entry) {
 						aNode = this.getNode(aNode);
-						entry.hidden = !aNode || isAncestor(aNode, node);
+						entry.hidden = !aNode || this.getInToolbar(aNode, node);
 					},
 					
 					// because if there's multiple toolbars added through this time, there will also be multiple of these entries,
 					// we only need to show one of these
 					showOnlyFirstMain: function(menu, aNode) {
 						aNode = this.getNode(aNode);
-						var hide = !aNode || isAncestor(aNode, aWindow.document.getElementById('nav-bar'));
+						var hide = !aNode || this.getInToolbar(aNode, aWindow.document.getElementById('nav-bar'));
 						
 						var mains = menu.getElementsByClassName('customize-context-moveToToolbar');
 						for(var m=0; m<mains.length; m++) {
