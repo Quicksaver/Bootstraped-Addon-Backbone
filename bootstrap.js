@@ -9,7 +9,6 @@
 //	chrome.manifest file with content, locale and skin declarations properly set
 // handleDeadObject(ex) - 	expects [nsIScriptError object] ex. Shows dead object notices as warnings only in the console.
 //				If the code can handle them accordingly and firefox does its thing, they shouldn't cause any problems.
-//				Of course this method will only return true in Firefox 15+.
 // prepareObject(window, aName) - initializes a window-dependent add-on object with utils loaded into it, returns the newly created object
 //	window - (xul object) the window object to be initialized
 //	(optional) aName - (string) the object name, defaults to objName
@@ -26,9 +25,9 @@
 //	aSubject - (xul object) to execute aCallback on
 //	aCallback - (function(aSubject)) to be called on aSubject
 // disable() - disables the add-on, in general the add-on disabling itself is a bad idea so I shouldn't use it
-// Note: Firefox 8 is the minimum version supported as the bootstrap requires the chrome.manifest file to be loaded, which was implemented in Firefox 8.
+// Note: Firefox 29 is the minimum version supported as the modules assume we're in a version with Australis already.
 
-let bootstrapVersion = '1.2.16';
+let bootstrapVersion = '1.3.0';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -47,14 +46,8 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource://gre/modules/PlacesUtils.jsm");
 Cu.import("resource://gre/modules/PluralForm.jsm");
+Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
 
-// This will be defined in builds with Australis enabled, easier than version checking in case they change this again.
-// I will change/remove this in the future when this is more certain
-let Australis = null;
-try { Australis = Cu.import("resource:///modules/CustomizableUI.jsm"); } catch(ex) {}
-
-// For some reason, PlacesUIUtils.jsm disappeared in FF21 (probably has to do with the whole PB restructuring that is going on)
-// So I'm adding the tools needed in it manually, makes no practical difference as far as I can tell
 // Note: defining the localStore lazy getter on the Services object causes a ZC if it's never called.
 let PlacesUIUtils = {};
 XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF", "@mozilla.org/rdf/rdf-service;1", "nsIRDFService");
@@ -63,14 +56,6 @@ XPCOMUtils.defineLazyGetter(PlacesUIUtils, "localStore", function() { return Pla
 XPCOMUtils.defineLazyServiceGetter(Services, "fuel", "@mozilla.org/fuel/application;1", "fuelIApplication");
 XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");
 XPCOMUtils.defineLazyServiceGetter(Services, "stylesheet", "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
-
-// Per-window private browsing was implemented as of FF20
-if(Services.vc.compare(Services.appinfo.platformVersion, "20.0") < 0) {
-	// This will only be called in FF19- for compatibility purposes
-	XPCOMUtils.defineLazyServiceGetter(Services, "privateBrowsing", "@mozilla.org/privatebrowsing;1", "nsIPrivateBrowsingService");
-} else {
-	Cu.import("resource://gre/modules/PrivateBrowsingUtils.jsm");
-}
 
 function handleDeadObject(ex) {
 	if(ex.message == "can't access dead object") {
@@ -93,7 +78,7 @@ function prepareObject(window, aName) {
 		objName: objectName,
 		objPathString: objPathString,
 		_UUID: new Date().getTime(),
-		
+		_sandbox: this,
 		// every supposedly global variable is inaccessible because bootstraped means sandboxed, so I have to reference all these;
 		// it's easier to reference more specific objects from within the modules for better control, only setting these two here because they're more generalized
 		window: window,
@@ -172,12 +157,6 @@ function callOnLoad(aSubject, aCallback, arg1) {
 }
 
 function setResourceHandler() {
-	// chrome.manifest files are loaded automatically in Firefox 10+.
-	// Got it from https://developer.mozilla.org/en-US/docs/XPCOM_Interface_Reference/nsIComponentManager#addBootstrappedManifestLocation()
-	if(Services.vc.compare(Services.appinfo.platformVersion, "10.0") < 0) {
-		Cm.addBootstrappedManifestLocation(AddonData.installPath);
-	}
-	
 	let alias = Services.io.newFileURI(AddonData.installPath);
 	let resourceURI = (AddonData.installPath.isDirectory()) ? alias.spec : 'jar:' + alias.spec + '!/';
 	resourceURI += 'resource/';
@@ -199,12 +178,6 @@ function removeResourceHandler() {
 	
 	let resource = Services.io.getProtocolHandler("resource").QueryInterface(Ci.nsIResProtocolHandler);
 	resource.setSubstitution(objPathString, null);
-	
-	// chrome.manifest files are loaded automatically in Firefox 10+.
-	// Got it from https://developer.mozilla.org/en-US/docs/XPCOM_Interface_Reference/nsIComponentManager#addBootstrappedManifestLocation()
-	if(Services.vc.compare(Services.appinfo.platformVersion, "10.0") < 0) {
-		Cm.removeBootstrappedManifestLocation(AddonData.installPath);
-	}
 }
 
 function disable() {
@@ -270,3 +243,96 @@ function shutdown(aData, aReason) {
 
 function install() {}
 function uninstall() {}
+function printO(obj, maxDepth, searchFor, prefix, prevObjs){
+	var resultObj = {};
+	if(maxDepth === undefined) maxDepth = 0;
+	if(!searchFor) searchFor = null;
+	if(!prefix) prefix = '';
+	if(typeof(obj) == 'object' && obj !== null) {
+		//obj = XPCNativeWrapper.unwrap(obj);
+		mainLoop: for(var key in obj) {
+			try {
+				if(typeof obj[key] == 'object' && obj[key] !== null) {
+					if(prevObjs) {
+						for(var p=0; p<prevObjs.length; p++) {
+							if(prevObjs[p].obj == obj[key]) {
+								if(!searchFor) { resultObj[prefix + key] = prevObjs[p].entry; }
+								continue mainLoop;
+							}
+						}
+					}
+					
+					if(maxDepth < 1) {
+						if(!searchFor) { resultObj[prefix + key] = obj[key] + ' [max depth reached]'; }
+					} else {
+						try { 
+							var newPrevObjs = [];
+							if(prevObjs) {
+								var newPrevObjs = prevObjs;
+							}
+							var newEntry = prefix ? prefix.substr(0, prefix.length-1) : 'printO(first object)';
+							newPrevObjs.push({ entry: newEntry, obj: obj });
+							var subResultObj = printO(obj[key], maxDepth -1, searchFor, prefix + key + '.', newPrevObjs);
+							for(var s in subResultObj) {
+								resultObj[s] = subResultObj[s];
+							}
+						}
+						catch(ex) { resultObj[prefix + key] = ' !ERROR PRINTING! ' + ex; }
+					}
+					
+				} else if(typeof obj[key] == 'string' && (!searchFor || obj[key].indexOf(searchFor) > -1)) {
+					resultObj[prefix + key] = '\'' + obj[key] + '\'';
+					
+				} else if(!searchFor || obj[key].toString().indexOf(searchFor) > -1) {
+					resultObj[prefix + key] = obj[key];
+				}
+			}
+			catch(ex) { 
+				if(!searchFor) { resultObj[prefix + key] = ' !ERROR PRINTING! ' + ex; } 
+			}
+		}
+	
+	} else if(typeof(obj) == 'string') {
+		resultObj[''] = '\'' + obj + '\'';
+	
+	} else {
+		resultObj[''] = obj;
+	}
+	
+	if(!prevObjs) {
+		var tempArr = [];
+		for(var r in resultObj) {
+			tempArr.push(r);
+		}
+		
+		if(tempArr.length == 0) { var result = (!searchFor) ? 'object is empty' : 'search string not found in object at maxDepth ' + maxDepth; }
+		else {
+			if(Array.isArray(obj)) {
+				tempArr.sort(function(a,b) { return a-b; });
+			} else {
+				tempArr.sort();
+			}
+			
+			var newResultObj = {};
+			for(var r=0; r<tempArr.length; r++) {
+				newResultObj[tempArr[r]] = resultObj[tempArr[r]];
+			}
+			
+			var result = '';
+			for(var r in newResultObj) {
+				result += r + '=' + newResultObj[r] + '\n';
+			}
+		}
+		
+		var gClipboardHelper = Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper);
+		gClipboardHelper.copyString(result);
+		
+		Services.console.logStringMessage("Object data copied to clipboard.");
+	}
+	else { return resultObj; }
+}
+
+function doLog(str) {
+	if(!str) { str = typeof(str)+': '+str; }
+	Services.console.logStringMessage(str);
+}
