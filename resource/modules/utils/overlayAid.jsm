@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.8.0';
+moduleAid.VERSION = '2.9.0';
 moduleAid.LAZY = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -345,63 +345,6 @@ this.overlayAid = {
 		}
 	},
 	
-	persistToolbarButton: function(aWindow, aNode) {
-		var aNodeID = aNode.id;
-		
-		var persistListener = function() {
-			var node = aWindow.document.getElementById(aNodeID);
-			var testNode = node;
-			if(!node) {
-				var toolboxes = aWindow.document.querySelectorAll('toolbox');
-				toolboxes_loop: for(var t=0; t<toolboxes.length; t++) {
-					if(!toolboxes[t].palette) { continue; }
-					
-					for(var c=0; c<toolboxes[t].palette.childNodes.length; c++) {
-						if(toolboxes[t].palette.childNodes[c].id == aNodeID) {
-							node = toolboxes[t].palette.childNodes[c];
-							break toolboxes_loop;
-						}
-					}
-				}
-			}
-			if(!node) { return; } // Fail-safe
-			
-			if(node.parentNode.nodeName == 'toolbarpalette') {
-				setAttribute(node, 'insertInToolbar', '');
-				setAttribute(node, '_toolbarSet', '');
-			} else {
-				setAttribute(node, 'insertInToolbar', node.parentNode.id);
-				setAttribute(node, '_toolbarSet', node.parentNode.getAttribute('currentset'));
-			}
-			
-			if(!testNode) {
-				var tempNode = aWindow.document.createElement('toolbarbutton'); // most common will be toolbarbutton, even though element type doesn't really matter here
-				tempNode.id = aNodeID;
-				tempNode.hidden = true;
-				tempNode = aWindow.document.documentElement.appendChild(tempNode);
-			}
-			
-			aWindow.document.persist(aNodeID, 'insertInToolbar');
-			aWindow.document.persist(aNodeID, '_toolbarSet');
-			
-			if(!testNode) {
-				tempNode.remove();
-			}
-		};
-		
-		aNode._removePersistListener = function() {
-			aWindow.removeEventListener('aftercustomization', persistListener);
-		};
-		
-		aWindow.addEventListener('aftercustomization', persistListener);
-		persistListener();
-		
-		this.traceBack(aWindow, {
-			action: 'persistToolbarButton',
-			node: aNode
-		});
-	},
-	
 	observingSchedules: function(aSubject, aTopic) {
 		if(UNLOADED) { return; }
 		
@@ -515,34 +458,6 @@ this.overlayAid = {
 		return false;
 	},
 	
-	updateOverlayedNodes: function(aWindow, node, nodeList) {
-		if(nodeList != undefined) {
-			for(var k = 0; k < nodeList.length; k++) {
-				aWindow[nodeList[k].x][nodeList[k].i].traceBack[nodeList[k].j][nodeList[k].nodeField] = node;
-			}
-			return true;
-		}
-		
-		nodeList = [];
-		var allAttr = this.getAllInAttr(aWindow);
-		for(var y=0; y<allAttr.length; y++) {
-			var x = '_OVERLAYS_'+allAttr[y];
-			if(!aWindow[x]) { continue; }
-			
-			for(var i = 0; i < aWindow[x].length; i++) {
-				for(var j = 0; j < aWindow[x][i].traceBack.length; j++) {
-					if(aWindow[x][i].traceBack[j].node && aWindow[x][i].traceBack[j].node == node) {
-						nodeList.push({ x: x, i: i, j: j, nodeField: 'node' });
-					}
-					else if(aWindow[x][i].traceBack[j].originalParent && aWindow[x][i].traceBack[j].originalParent == node) {
-						nodeList.push({ x: x, i: i, j: j, nodeField: 'originalParent' });
-					}
-				}
-			}
-		}
-		return nodeList;
-	},
-	
 	getNewOrder: function(aWindow) {
 		var time = new Date().getTime();
 		var allAttr = this.getAllInAttr(aWindow);
@@ -653,10 +568,6 @@ this.overlayAid = {
 				}
 			}
 			
-			if(action.node) {
-				var updateList = this.updateOverlayedNodes(aWindow, action.node);
-			}
-			
 			try {
 				switch(action.action) {
 					case 'appendChild':
@@ -668,7 +579,7 @@ this.overlayAid = {
 								}
 								var browserList = this.swapBrowsers(aWindow, action.node);
 								
-								action.node = action.originalParent.insertBefore(action.node, sibling);
+								action.originalParent.insertBefore(action.node, sibling);
 								
 								this.swapBrowsers(aWindow, action.node, browserList);
 							}
@@ -693,9 +604,9 @@ this.overlayAid = {
 							var browserList = this.swapBrowsers(aWindow, action.node);
 							
 							if(action.originalPos < action.node.parentNode.childNodes.length) {
-								action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
+								action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
 							} else {
-								action.node = action.originalParent.appendChild(action.node);
+								action.originalParent.appendChild(action.node);
 							}
 							
 							this.swapBrowsers(aWindow, action.node, browserList);
@@ -707,9 +618,9 @@ this.overlayAid = {
 							this.registerAreas(aWindow, node);
 							
 							if(action.originalPos < action.originalParent.childNodes.length) {
-								action.node = action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
+								action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
 							} else {
-								action.node = action.originalParent.appendChild(action.node);
+								action.originalParent.appendChild(action.node);
 							}
 						}
 						break;
@@ -832,10 +743,6 @@ this.overlayAid = {
 				}
 			} catch(ex) {
 				Cu.reportError(ex);
-			}
-			
-			if(action.node) {
-				this.updateOverlayedNodes(aWindow, action.node, updateList);
 			}
 		}
 		
@@ -1173,7 +1080,7 @@ this.overlayAid = {
 				if(trueAttribute(overlayNode, 'removeelement')) {
 					// Check if we are removing any toolbars, we can't do this
 					if(!this.removingToolbars(aWindow, node)) {
-						node = this.removeChild(aWindow, node);
+						this.removeChild(aWindow, node);
 					}
 					
 					continue;
@@ -1188,7 +1095,7 @@ this.overlayAid = {
 				}
 				
 				// Move the node around if necessary
-				node = this.moveAround(aWindow, node, overlayNode, node.parentNode);
+				this.moveAround(aWindow, node, overlayNode, node.parentNode);
 				
 				// Get Children of an Element's ID into this node
 				this.getChildrenOf(aWindow, node);
@@ -1203,7 +1110,7 @@ this.overlayAid = {
 				this.registerAreas(aWindow, node);
 				
 				// Add the node to the correct place
-				node = this.moveAround(aWindow, node, overlayNode, aWindow.document.getElementById(overlayNode.parentNode.id));
+				this.moveAround(aWindow, node, overlayNode, aWindow.document.getElementById(overlayNode.parentNode.id));
 				
 				// Check if we are adding any toolbars so we remove it later from the toolbox
 				this.addToolbars(aWindow, node);
@@ -1255,9 +1162,9 @@ this.overlayAid = {
 		};
 		
 		setAttribute(node.tempAppend.container, 'style', 'position: fixed; top: 4000px; left: 4000px; opacity: 0.001;');
-		node.tempAppend.container = aWindow.document.documentElement.appendChild(node.tempAppend.container);
+		aWindow.document.documentElement.appendChild(node.tempAppend.container);
 		
-		node = node.tempAppend.container.appendChild(node);
+		node.tempAppend.container.appendChild(node);
 	},
 	tempRestoreToolbar: function(node) {
 		if(node.tempAppend) {
@@ -1576,13 +1483,11 @@ this.overlayAid = {
 	
 	appendChild: function(aWindow, node, parent) {
 		var originalParent = node.parentNode;
-		var updateList = this.updateOverlayedNodes(aWindow, node);
 		var browserList = this.swapBrowsers(aWindow, node);
 		
-		try { node = parent.appendChild(node); } catch(ex) { Cu.reportError(ex); node = null; }
+		try { parent.appendChild(node); } catch(ex) { Cu.reportError(ex); }
 		
 		this.swapBrowsers(aWindow, node, browserList);
-		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'appendChild',
 			node: node,
@@ -1601,13 +1506,11 @@ this.overlayAid = {
 				}
 			}
 		}
-		var updateList = this.updateOverlayedNodes(aWindow, node);
 		var browserList = this.swapBrowsers(aWindow, node);
 		
-		try { node = parent.insertBefore(node, sibling); } catch(ex) { Cu.reportError(ex); return null; }
+		try { parent.insertBefore(node, sibling); } catch(ex) { Cu.reportError(ex); }
 		
 		this.swapBrowsers(aWindow, node, browserList);
-		this.updateOverlayedNodes(aWindow, node, updateList);
 		if(!originalParent) {
 			this.traceBack(aWindow, {
 				action: 'appendChild',
@@ -1776,7 +1679,7 @@ this.overlayAid = {
 		newTemp.collapsed = true;
 		setAttribute(newTemp, 'type', type || 'chrome');
 		setAttribute(newTemp, 'src', 'about:blank');
-		newTemp = aWindow.document.documentElement.appendChild(newTemp);
+		aWindow.document.documentElement.appendChild(newTemp);
 		newTemp.docShell.createAboutBlankContentViewer(null);
 		return newTemp;
 	},
@@ -1827,7 +1730,6 @@ this.overlayAid = {
 	},
 	
 	removeChild: function(aWindow, node) {
-		var updateList = this.updateOverlayedNodes(aWindow, node);
 		var originalParent = node.parentNode;
 		
 		var o = 0;
@@ -1839,9 +1741,8 @@ this.overlayAid = {
 			}
 		}
 		
-		try { node.remove(); } catch(ex) { Cu.reportError(ex); node = null; }
+		try { node.remove(); } catch(ex) { Cu.reportError(ex); }
 		
-		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'removeChild',
 			node: node,
@@ -1874,8 +1775,8 @@ this.overlayAid = {
 		try {
 			node = aWindow.document.importNode(node, true);
 			// these have to come before the actual window element
-			node = aWindow.document.insertBefore(node, aWindow.document.documentElement);
-		} catch(ex) { node = null; }
+			aWindow.document.insertBefore(node, aWindow.document.documentElement);
+		} catch(ex) {}
 		this.traceBack(aWindow, {
 			action: 'appendXMLSS',
 			node: node
@@ -1891,8 +1792,8 @@ this.overlayAid = {
 		if(prefElements.length == 0) {
 			try {
 				var prefs = aWindow.document.importNode(node, true);
-				prefs = prefPane.appendChild(prefs);
-			} catch(ex) { prefs = null; }
+				prefPane.appendChild(prefs);
+			} catch(ex) {}
 			this.traceBack(aWindow, {
 				action: 'addPreferencesElement',
 				prefs: prefs
@@ -1906,8 +1807,8 @@ this.overlayAid = {
 			
 			try {
 				var pref = aWindow.document.importNode(node.childNodes[p], true);
-				pref = prefs.appendChild(pref);
-			} catch(ex) { pref = null; }
+				prefs.appendChild(pref);
+			} catch(ex) {}
 			this.traceBack(aWindow, {
 				action: 'addPreference',
 				pref: pref
@@ -1941,11 +1842,9 @@ this.overlayAid = {
 	},
 	
 	appendButton: function(aWindow, palette, node) {
-		var updateList = this.updateOverlayedNodes(aWindow, node);
-		
 		if(!node.parentNode
 		|| (node.parentNode != palette && node.parentNode.id != 'wrapper-'+node.id && palette.nodeName == 'toolbarpalette')) {
-			node = palette.appendChild(node);
+			palette.appendChild(node);
 		}
 		var id = node.id;
 		
@@ -1972,7 +1871,6 @@ this.overlayAid = {
 		
 		if(!node) { node = aWindow.document.getElementById(id); }
 		
-		this.updateOverlayedNodes(aWindow, node, updateList);
 		this.traceBack(aWindow, {
 			action: 'appendButton',
 			node: node
