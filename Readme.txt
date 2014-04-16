@@ -1,0 +1,3 @@
+This is the backbone I use for all my add-ons. It ensures that they are 100% compatible with each other, simplifying the feature implementations by the add-ons. If you wish to use it yourself, you can do so, but make sure you keep it updated to ensure its proper functioning for new versions of firefox or of other add-ons that use it.
+
+All the files have instructions on how to use their objects at the top of the file. I suggest you start with bootstrap.js which has some general first-build information, and if you have any questions or problems you can always ask me of course.
