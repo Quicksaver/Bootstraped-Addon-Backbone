@@ -1,4 +1,4 @@
-moduleAid.VERSION = '1.0.0';
+moduleAid.VERSION = '1.0.1';
 moduleAid.UTILS = true;
 
 // messenger - 	Aid object to communicate with browser content scripts (e10s).
@@ -80,6 +80,15 @@ this.messenger = {
 		this.globalMM.removeMessageListener(objName+':'+aMessage, aListener);
 	},
 	
+	getInitialPrefs: function(m) {
+		var current = {};
+		for(var pref in prefList) {
+			if(pref.startsWith('NoSync_')) { continue; }
+			current[pref] = prefAid[pref];
+		}
+		messenger.messageBrowser(m.target, 'pref', current);
+	},
+	
 	carryPref: function(pref, val) {
 		if(pref.startsWith('NoSync_')) { return; }
 		
@@ -90,6 +99,7 @@ this.messenger = {
 };
 
 moduleAid.LOADMODULE = function() {
+	messenger.listenAll('getPrefAid', messenger.getInitialPrefs);
 	messenger.globalMM.loadFrameScript('resource://'+objPathString+'/modules/utils/content.js', true);
 	
 	for(var pref in prefList) {
@@ -97,17 +107,11 @@ moduleAid.LOADMODULE = function() {
 		
 		prefAid.listen(pref, messenger.carryPref);
 	}
-	
-	// carry the initial (current) pref values over to content scripts
-	var current = {};
-	for(var pref in prefList) {
-		if(pref.startsWith('NoSync_')) { continue; }
-		current[pref] = prefAid[pref];
-	}
-	messenger.messageAll('pref', current);
 };
 
 moduleAid.UNLOADMODULE = function() {
+	messenger.unlistenAll('getPrefAid', messenger.getInitialPrefs);
+	
 	for(var pref in prefList) {
 		if(pref.startsWith('NoSync_')) { continue; }
 		
