@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.2.1';
+moduleAid.VERSION = '2.2.2';
 moduleAid.UTILS = true;
 
 // browserMediator - Aid object to track and perform tasks on all document browsers across the windows.
@@ -31,8 +31,8 @@ this.browserMediator = {
 				for(var b=0; b<aWindow.gBrowser.browsers.length; b++) {
 					var aBrowser = aWindow.gBrowser.getBrowserAtIndex(b);
 					
-					// e10s fix, we don't check remote tabs, we only check about: and chrome:// tabs
-					if(aBrowser.documentURI.scheme != 'about' && aBrowser.documentURI.scheme != 'chrome') { continue; }
+					// e10s fix, we don't check remote tabs
+					if(trueAttribute(aBrowser, 'remote')) { continue; }
 					
 					if(!aURI || aBrowser.contentDocument.documentURI == aURI) {
 						if(aBrowser.contentDocument.readyState == "complete" || beforeComplete) {
@@ -119,7 +119,7 @@ this.browserMediator = {
 	// pagehide and unload by themselves don't catch everything, this completes it
 	tabClosed: function(e) {
 		// e10s fix, we don't check remote tabs, we only check about: and chrome:// tabs
-		if(e.target.linkedBrowser.documentURI.scheme != 'about' && e.target.linkedBrowser.documentURI.scheme != 'chrome') { return; }
+		if(trueAttribute(e.target.linkedBrowser, 'remote')) { return; }
 		
 		browserMediator.callWatchers({
 			type: 'pagehide',
