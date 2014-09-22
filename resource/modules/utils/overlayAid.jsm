@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.11.5';
+moduleAid.VERSION = '2.11.6';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -15,8 +15,8 @@ moduleAid.UTILS = true;
 // Its content will be added to the window where a similar element exists with the same id value. If such an element does not exist, that part of the overlay is ignored.
 // If there is content inside both the XUL window and in the overlay, the window's content will be used as is and the overlay's content will be appended to the end.
 // The children of the overlay's element are inserted as children of the base window's element.
-//	If the overlay's element contains an insertafter attribute, the element is added just after the element in the base window with the id that matches the value of this attribute.
 //	If the overlay's element contains an insertbefore attribute, the element is added just before the element in the base window with the id that matches the value of this attribute.
+//	If the overlay's element contains an insertafter attribute, the element is added just after the element in the base window with the id that matches the value of this attribute.
 //	If the overlay's element contains an position attribute, the element is added at the one-based index specified in this attribute.
 //	Otherwise, the element is added as the last child.
 // If you would like to remove an element that is already in the XUL file, create elements with removeelement attribute.
@@ -1507,31 +1507,31 @@ this.overlayAid = {
 			if(newParent) { parent = newParent; }
 		}
 		
-		if(overlayNode.getAttribute('insertafter')) {
-			var idList = overlayNode.getAttribute('insertafter').split(',');
-			for(var i = 0; i < idList.length; i++) {
-				var id = trim(idList[i]);
+		if(overlayNode.getAttribute('insertbefore')) {
+			var idList = overlayNode.getAttribute('insertbefore').split(',');
+			for(var i of idList) {
+				var id = trim(i);
 				if(id == '') { continue; }
 				if(id == node.id) { continue; } // this is just stupid of course...
 				
-				for(var c = 0; c < parent.childNodes.length; c++) {
-					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(aWindow, node, parent, parent.childNodes[c].nextSibling);
+				for(var c of parent.childNodes) {
+					if(c.id == id) {
+						return this.insertBefore(aWindow, node, parent, c);
 					}
 				}
 			}
 		}
 		
-		if(overlayNode.getAttribute('insertbefore')) {
-			var idList = overlayNode.getAttribute('insertbefore').split(',');
-			for(var i = 0; i < idList.length; i++) {
-				var id = trim(idList[i]);
+		if(overlayNode.getAttribute('insertafter')) {
+			var idList = overlayNode.getAttribute('insertafter').split(',');
+			for(var i of idList) {
+				var id = trim(i);
 				if(id == '') { continue; }
 				if(id == node.id) { continue; } // this is just stupid of course...
 				
-				for(var c = 0; c < parent.childNodes.length; c++) {
-					if(parent.childNodes[c].id == id) {
-						return this.insertBefore(aWindow, node, parent, parent.childNodes[c]);
+				for(var c of parent.childNodes) {
+					if(c.id == id) {
+						return this.insertBefore(aWindow, node, parent, c.nextSibling);
 					}
 				}
 			}
