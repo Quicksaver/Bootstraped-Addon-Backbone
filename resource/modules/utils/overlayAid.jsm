@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.11.6';
+moduleAid.VERSION = '2.11.7';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -435,8 +435,11 @@ this.overlayAid = {
 	
 	traceBack: function(aWindow, traceback, unshift) {
 		if(traceback.node) { traceback.nodeID = traceback.node.id; }
-		if(traceback.originalParent) { traceback.originalParentID = traceback.originalParent.id; }
 		if(traceback.palette) { traceback.paletteID = traceback.palette.id; }
+		if(traceback.original && traceback.original.parent) {
+			traceback.original.parentID = traceback.original.parent.id;
+			traceback.originalParent = traceback.original.parent; // so the rest of the script can use regular loops when checking for it
+		}
 		
 		if(!unshift) {
 			aWindow['_OVERLAYS_'+objName][aWindow._BEING_OVERLAYED].traceBack.push(traceback);
@@ -544,13 +547,13 @@ this.overlayAid = {
 		var conflictingFields = ['node', 'originalParent'];
 		
 		// we need to go through their traceBack's to see if any of them might conflict with each other
-		for(var aT=0; aT<aOverlay.traceBack.length; aT++) {
-			if(skipActions.indexOf(aOverlay.traceBack[aT].action) > -1) { continue; }
-			var aAction = this.fixTraceBackNodes(aWindow, aOverlay.traceBack[aT]);
+		for(var traceA of aOverlay.traceBack) {
+			if(skipActions.indexOf(traceA.action) > -1) { continue; }
+			var aAction = this.fixTraceBackNodes(aWindow, traceA);
 			
-			for(var bT=0; bT<bOverlay.traceBack.length; bT++) {
-				if(skipActions.indexOf(bOverlay.traceBack[bT].action) > -1) { continue; }
-				var bAction = this.fixTraceBackNodes(aWindow, bOverlay.traceBack[bT]);
+			for(var traceB of bOverlay.traceBack) {
+				if(skipActions.indexOf(traceB.action) > -1) { continue; }
+				var bAction = this.fixTraceBackNodes(aWindow, traceB);
 				
 				// if any of the nodes overlap, we consider them conflicting
 				for(var aa=0; aa<conflictingFields.length; aa++) {
@@ -569,7 +572,10 @@ this.overlayAid = {
 	
 	fixTraceBackNodes: function(aWindow, action) {
 		if(action.nodeID) { action.node = action.node || aWindow.document.getElementById(action.nodeID); }
-		if(action.originalParentID) { action.originalParent = action.originalParent || aWindow.document.getElementById(action.originalParentID); }
+		if(action.original && action.original.parentID) {
+			action.original.parent = action.original.parent || aWindow.document.getElementById(action.original.parentID);
+			action.originalParent = action.original.parent;
+		}
 		if(action.paletteID && !action.palette) {
 			var toolbox = aWindow.document.querySelectorAll('toolbox');
 			for(var a=0; a<toolbox.length; a++) {
@@ -635,15 +641,21 @@ this.overlayAid = {
 			try {
 				switch(action.action) {
 					case 'appendChild':
+					case 'insertBefore':
 						if(action.node) {
-							if(action.originalParent) {
-								var sibling = action.originalParent.firstChild
-								if(sibling && sibling.nodeName == 'preferences') {
-									sibling = sibling.nextSibling;
+							if(action.original && action.original.parent) {
+								if(action.original.pos !== undefined) {
+									var sibling = action.original.parent.childNodes[action.original.pos];
+								} else {
+									var sibling = action.original.parent.firstChild;
+									if(sibling && sibling.nodeName == 'preferences') {
+										sibling = sibling.nextSibling;
+									}
 								}
+								
 								var browserList = this.swapBrowsers(aWindow, action.node);
 								
-								action.originalParent.insertBefore(action.node, sibling);
+								action.original.parent.insertBefore(action.node, sibling);
 								
 								this.swapBrowsers(aWindow, action.node, browserList);
 							}
@@ -652,39 +664,15 @@ this.overlayAid = {
 							}
 						}
 						break;
-						
-					case 'insertBefore':
-						if(action.node && action.originalParent) {
-							if(action.node.parentNode == action.originalParent) {
-								for(var o=0; o<action.originalParent.childNodes.length; o++) {
-									if(action.originalParent.childNodes[o] == action.node) {
-										if(o < action.originalPos) {
-											action.originalPos++;
-										}
-										break;
-									}
-								}
-							}
-							var browserList = this.swapBrowsers(aWindow, action.node);
-							
-							if(action.originalPos < action.node.parentNode.childNodes.length) {
-								action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
-							} else {
-								action.originalParent.appendChild(action.node);
-							}
-							
-							this.swapBrowsers(aWindow, action.node, browserList);
-						}
-						break;
 					
 					case 'removeChild':
-						if(action.node && action.originalParent) {
+						if(action.node && action.original && action.original.parent) {
 							this.registerAreas(aWindow, node);
 							
-							if(action.originalPos < action.originalParent.childNodes.length) {
-								action.originalParent.insertBefore(action.node, action.originalParent.childNodes[action.originalPos]);
+							if(action.original.pos !== undefined && action.original.pos < action.original.parent.childNodes.length) {
+								action.original.parent.insertBefore(action.node, action.original.parent.childNodes[action.original.pos]);
 							} else {
-								action.originalParent.appendChild(action.node);
+								action.original.parent.appendChild(action.node);
 							}
 						}
 						break;
@@ -1571,7 +1559,7 @@ this.overlayAid = {
 	},
 	
 	appendChild: function(aWindow, node, parent) {
-		var originalParent = node.parentNode;
+		var original = this.getOriginalParent(node);
 		var browserList = this.swapBrowsers(aWindow, node);
 		
 		try { parent.appendChild(node); }
@@ -1581,43 +1569,42 @@ this.overlayAid = {
 		this.traceBack(aWindow, {
 			action: 'appendChild',
 			node: node,
-			originalParent: originalParent
+			original: original
 		});
 		return node;
 	},
 	
 	insertBefore: function(aWindow, node, parent, sibling) {
-		var originalParent = node.parentNode;
-		
-		if(originalParent) {
-			for(var o = 0; o < originalParent.childNodes.length; o++) {
-				if(originalParent.childNodes[o] == node) {
-					break;
-				}
-			}
-		}
+		var original = this.getOriginalParent(node);
 		var browserList = this.swapBrowsers(aWindow, node);
 		
 		try { parent.insertBefore(node, sibling); }
 		catch(ex) { Cu.reportError(ex); }
 		
 		this.swapBrowsers(aWindow, node, browserList);
-		if(!originalParent) {
-			this.traceBack(aWindow, {
-				action: 'appendChild',
-				node: node,
-				originalParent: null
-			});
-		} else {
-			this.traceBack(aWindow, {
-				action: 'insertBefore',
-				node: node,
-				originalParent: originalParent,
-				originalPos: o
-			});
-		}
+		this.traceBack(aWindow, {
+			action: 'insertBefore',
+			node: node,
+			original: original
+		});
 		
 		return node;
+	},
+	
+	getOriginalParent: function(aNode) {
+		var originalParent = aNode.parentNode;
+		
+		if(originalParent) {
+			for(var o = 0; o < originalParent.childNodes.length; o++) {
+				if(originalParent.childNodes[o] == aNode) {
+					return { parent: originalParent, pos: o };
+				}
+			}
+			
+			return { parent: originalParent };
+		}
+		
+		return { parent: originalParent };
 	},
 	
 	// this ensures we don't need to reload any browser elements when they are moved within the DOM;
@@ -1821,16 +1808,7 @@ this.overlayAid = {
 	},
 	
 	removeChild: function(aWindow, node) {
-		var originalParent = node.parentNode;
-		
-		var o = 0;
-		if(node.parentNode) {
-			for(o = 0; o < node.parentNode.childNodes.length; o++) {
-				if(node.parentNode.childNodes[o] == node) {
-					break;
-				}
-			}
-		}
+		var original = this.getOriginalParent(node);
 		
 		try { node.remove(); }
 		catch(ex) { Cu.reportError(ex); }
@@ -1838,8 +1816,7 @@ this.overlayAid = {
 		this.traceBack(aWindow, {
 			action: 'removeChild',
 			node: node,
-			originalParent: originalParent,
-			originalPos: o
+			original: original
 		});
 		return node;
 	},
