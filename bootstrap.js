@@ -3,8 +3,9 @@
 //	objName - (string) main object name for the add-on, to be added to window element
 //	objPathString - (string) add-on path name to use in URIs
 //	prefList: (object) { prefName: defaultValue } - add-on preferences
-//	startConditions(aData, aReason) - (method) should return false if any requirements the add-on needs aren't met, otherwise return true or call continueStartup(aData, aReason)
-//	onStartup(aData, aReason) and onShutdown(aData, aReason) - (methods) to be called on startup() and shutdown() to initialize and terminate the add-on respectively
+//	startConditions(aData, aReason) -	(optional) (method) should return false if any requirements the add-on needs aren't met,
+//						otherwise return true or call continueStartup(aData, aReason)
+//	onStartup/onShutdown/onInstall/onUninstall(aData, aReason) - (optional) (methods) to be called on startup() and shutdown() to initialize and terminate the add-on
 //	resource folder in installpath, with modules folder containing moduleAid, sandboxUtils and utils modules
 //	chrome.manifest file with content, locale and skin declarations properly set
 // handleDeadObject(ex) - 	expects [nsIScriptError object] ex. Shows dead object notices as warnings only in the console.
@@ -28,7 +29,7 @@
 // Note: Firefox 30 is the minimum version supported as the modules assume we're in a version with Australis already,
 // along with a minor assumption in overlayAid about a small change introduced to CustomizableUI in FF30.
 
-let bootstrapVersion = '1.4.4';
+let bootstrapVersion = '1.4.5';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -203,7 +204,9 @@ function disable() {
 
 function continueStartup(aReason) {
 	STARTED = aReason;
-	onStartup(aReason);
+	if(typeof(onStartup) == 'function') {
+		onStartup(AddonData, aReason);
+	}
 }
 
 function startup(aData, aReason) {
@@ -229,7 +232,7 @@ function startup(aData, aReason) {
 	prefAid.setDefaults(prefList);
 	
 	// In the case of OmnibarPlus, I need the Omnibar add-on enabled for everything to work
-	if(startConditions(aReason)) {
+	if(typeof(startConditions) != 'function' || startConditions(aReason)) {
 		continueStartup(aReason);
 	}
 }
@@ -250,7 +253,9 @@ function shutdown(aData, aReason) {
 	
 	if(STARTED) {
 		closeOptions();
-		onShutdown(aReason);
+		if(typeof(onShutdown) == 'function') {
+			onShutdown(aData, aReason);
+		}
 	}
 	
 	// remove resource://
@@ -258,5 +263,14 @@ function shutdown(aData, aReason) {
 	removeOnceListener();
 }
 
-function install() {}
-function uninstall() {}
+function install(aData, aReason) {
+	if(typeof(onInstall) == 'function') {
+		onInstall(aData, aReason);
+	}
+}
+
+function uninstall(aData, aReason) {
+	if(typeof(onUninstall) == 'function') {
+		onUninstall(aData, aReason);
+	}
+}
