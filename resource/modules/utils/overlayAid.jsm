@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.11.8';
+moduleAid.VERSION = '2.12.0';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -28,6 +28,8 @@ moduleAid.UTILS = true;
 // Elements with a getchildrenof attribute will inherit all the children from the elements specified by the comma-separated list of element ids.
 // Every occurence of (string) objName and (string) objPathString in every attribute in the overlay will be properly replaced with this object's objName and objPathString.
 // I can also overlay other overlays provided they are loaded through the overlayAid object (either from this add-on or another implementing it).
+// Calling document.persist() for nodes added through here will not work by itself, it will only work if the node has the "persist" attribute explicitely set in the overlay, with a
+// comma-separated list of the attributes to persist. Normal XUL persistence through the "persist" attribute should work as expected.
 // If the toolbar element in the overlays has the following attributes, the system will add the corresponding customize context menu items:
 //	menuAdd : "Add to X" context menu entries
 //	menuMove : "Move to X" context menu entries
@@ -732,19 +734,19 @@ this.overlayAid = {
 								action.node.remove();
 							}
 							
-							var widget = aWindow.CustomizableUI.getWidget(action.node.id);
-							if(widget && widget.provider == aWindow.CustomizableUI.PROVIDER_API) {
+							var widget = CustomizableUI.getWidget(action.node.id);
+							if(widget && widget.provider == CustomizableUI.PROVIDER_API) {
 								// see note below (on createWidget)
-								var placement = aWindow.CustomizableUI.getPlacementOfWidget(action.node.id, aWindow);
-								var areaType = (placement) ? aWindow.CustomizableUI.getAreaType(placement.area) : null;
-								if(areaType == aWindow.CustomizableUI.TYPE_TOOLBAR) {
+								var placement = CustomizableUI.getPlacementOfWidget(action.node.id, aWindow);
+								var areaType = (placement) ? CustomizableUI.getAreaType(placement.area) : null;
+								if(areaType == CustomizableUI.TYPE_TOOLBAR) {
 									this.tempAppendAllToolbars(aWindow, placement.area);
 								}
 								
-								try { aWindow.CustomizableUI.destroyWidget(action.node.id); }
+								try { CustomizableUI.destroyWidget(action.node.id); }
 								catch(ex) { Cu.reportError(ex); }
 								
-								if(areaType == aWindow.CustomizableUI.TYPE_TOOLBAR) {
+								if(areaType == CustomizableUI.TYPE_TOOLBAR) {
 									this.tempRestoreAllToolbars(aWindow, placement.area);
 								}
 							}
@@ -753,18 +755,6 @@ this.overlayAid = {
 					
 					case 'addToolbar':
 						if(action.node) {
-							if(action.toolboxid) {
-								var toolbox = aWindow.document.getElementById(action.toolboxid);
-								if(toolbox) {
-									for(var et=0; et<toolbox.externalToolbars.length; et++) {
-										if(toolbox.externalToolbars[et] == action.node) {
-											toolbox.externalToolbars.splice(et, 1);
-											break;
-										}
-									}
-								}
-							}
-							
 							aWindow.removeEventListener('unload', action.node._menuEntries.onClose);
 							
 							// remove the context menu entries associated with this toolbar
@@ -800,11 +790,11 @@ this.overlayAid = {
 							
 							delete action.node._menuEntries;
 							
-							if(aWindow.CustomizableUI.getAreaType(action.node.id)) {
+							if(CustomizableUI.getAreaType(action.node.id)) {
 								// see note in runRegisterToolbar(), we need this in all toolbars as well
 								this.tempAppendAllToolbars(aWindow, action.node.id);
 								
-								try { aWindow.CustomizableUI.unregisterArea(action.node.id); }
+								try { CustomizableUI.unregisterArea(action.node.id); }
 								catch(ex) { Cu.reportError(ex); }
 								
 								this.tempRestoreAllToolbars(aWindow, action.node.id);
@@ -906,11 +896,11 @@ this.overlayAid = {
 						var node = data.onBuild(aWindow.document, true);
 						if(node) { node.remove(); }
 					}, 'navigator:browser');
-					aWindow.CustomizableUI.removeListener(this);
+					CustomizableUI.removeListener(this);
 				}
 			};
 			
-			aWindow.CustomizableUI.addListener(data);
+			CustomizableUI.addListener(data);
 		}
 		
 		return data;
@@ -1174,8 +1164,8 @@ this.overlayAid = {
 				// Surf through all the children of node for the getchildrenof attribute
 				if(node.getElementsByAttribute) {
 					var allGetChildrenOf = node.getElementsByAttribute('getchildrenof', '*');
-					for(var gco = 0; gco < allGetChildrenOf.length; gco++) {
-						this.getChildrenOf(aWindow, allGetChildrenOf[gco]);
+					for(var attrNode of allGetChildrenOf) {
+						this.getChildrenOf(aWindow, attrNode);
 					}
 				}
 			}
@@ -1183,19 +1173,22 @@ this.overlayAid = {
 	},
 	
 	registerAreas: function(aWindow, node) {
-		if(node.nodeName == 'toolbar' && node.id && !trueAttribute(node, 'ignoreCUI') && !aWindow.CustomizableUI.getAreaType(node.id)) {
+		if(node.nodeName == 'toolbar' && node.id && !trueAttribute(node, 'ignoreCUI') && !CustomizableUI.getAreaType(node.id)) {
 			try {
 				var barArgs = {
-					type: aWindow.CustomizableUI.TYPE_TOOLBAR,
+					type: CustomizableUI.TYPE_TOOLBAR,
 					legacy: true,
 					defaultCollapsed: null
 				};
-				aWindow.CustomizableUI.registerArea(node.id, barArgs);
+				if(trueAttribute(node, 'overflowable')) {
+					barArgs.overflowable = true;
+				}
+				CustomizableUI.registerArea(node.id, barArgs);
 			} catch(ex) { Cu.reportError(ex); }
 		}
 		
-		for(var nc=0; nc<node.childNodes.length; nc++) {
-			this.registerAreas(aWindow, node.childNodes[nc]);
+		for(var child of node.childNodes) {
+			this.registerAreas(aWindow, child);
 		}
 	},
 	
@@ -1275,19 +1268,6 @@ this.overlayAid = {
 			
 			if(toolbox) {
 				toggleAttribute(node, 'mode', toolbox.getAttribute('mode'), toolbox.getAttribute('mode'));
-				
-				if(toolbox != node.parentNode) {
-					var addExternal = true;
-					for(var t=0; t<toolbox.externalToolbars.length; t++) {
-						if(toolbox.externalToolbars[t] == node) {
-							addExternal = false;
-							break;
-						}
-					}
-					if(addExternal) {
-						toolbox.externalToolbars.push(node);
-					}
-				}
 			}
 			
 			// The toolbar doesn't run the constructor until it is visible. And we want it to run regardless if it is visible or not.
@@ -1366,9 +1346,9 @@ this.overlayAid = {
 				
 				addCommand: function(aNode) {
 					aNode = this.getNode(aNode);
-					aWindow.CustomizableUI.addWidgetToArea(aNode.id, this.toolbarID);
+					CustomizableUI.addWidgetToArea(aNode.id, this.toolbarID);
 					if(!aWindow.gCustomizeMode._customizing) {
-						aWindow.CustomizableUI.dispatchToolboxEvent("customizationchange");
+						CustomizableUI.dispatchToolboxEvent("customizationchange");
 					}
 				},
 				
@@ -1479,7 +1459,6 @@ this.overlayAid = {
 			this.traceBack(aWindow, {
 				action: 'addToolbar',
 				node: node,
-				toolboxid: node.getAttribute('toolboxid'),
 				palette: palette
 			});
 		}
@@ -1925,16 +1904,16 @@ this.overlayAid = {
 		}
 		var id = node.id;
 		
-		var widget = aWindow.CustomizableUI.getWidget(id);
-		if(!widget || widget.provider != aWindow.CustomizableUI.PROVIDER_API) {
+		var widget = CustomizableUI.getWidget(id);
+		if(!widget || widget.provider != CustomizableUI.PROVIDER_API) {
 			// this needs the binding applied on the toolbar in order for the widget to be immediatelly placed there,
 			// and since its placements won't be restored until it's created, we have to search for it in all existing areas
 			var areaId = null;
 			var areas = CustomizableUI.areas;
 			for(var a=0; a<areas.length; a++) {
-				var inArea = aWindow.CustomizableUI.getWidgetIdsInArea(areas[a]);
+				var inArea = CustomizableUI.getWidgetIdsInArea(areas[a]);
 				if(inArea.indexOf(id) > -1) {
-					if(aWindow.CustomizableUI.getAreaType(areas[a]) != aWindow.CustomizableUI.TYPE_TOOLBAR) { break; }
+					if(CustomizableUI.getAreaType(areas[a]) != CustomizableUI.TYPE_TOOLBAR) { break; }
 					
 					areaId = areas[a];
 					this.tempAppendAllToolbars(aWindow, areaId);
@@ -1942,7 +1921,7 @@ this.overlayAid = {
 				}
 			}
 			
-			try { aWindow.CustomizableUI.createWidget(this.getWidgetData(aWindow, node, palette)); }
+			try { CustomizableUI.createWidget(this.getWidgetData(aWindow, node, palette)); }
 			catch(ex) { Cu.reportError(ex); }
 			
 			if(areaId) {
@@ -1951,13 +1930,13 @@ this.overlayAid = {
 		}
 		
 		else {
-			var placement = aWindow.CustomizableUI.getPlacementOfWidget(id, aWindow);
+			var placement = CustomizableUI.getPlacementOfWidget(id, aWindow);
 			var areaNode = (placement) ? aWindow.document.getElementById(placement.area) : null;
 			if(areaNode && areaNode.nodeName == 'toolbar' && !areaNode._init) {
 				this.tempAppendToolbar(aWindow, areaNode);
 			}
 			
-			try { aWindow.CustomizableUI.ensureWidgetPlacedInWindow(id, aWindow); }
+			try { CustomizableUI.ensureWidgetPlacedInWindow(id, aWindow); }
 			catch(ex) { Cu.reportError(ex); }
 			
 			if(areaNode) {
@@ -1992,6 +1971,21 @@ this.overlayAid = {
 		
 		attr.splice(attr.indexOf(objName), 1);
 		toggleAttribute(aWindow.document.documentElement, 'Bootstrapped_Overlays', attr.length > 0, attr.join(' '));
+	},
+	
+	registerToolbarNode: function(aToolbar, aExistingChildren) {
+		if(!aToolbar || !aToolbar.id || !aToolbar.ownerDocument.getElementById(aToolbar.id)) {
+			aSync(function() { CustomizableUI.registerToolbarNode(aToolbar, aExistingChildren); }, 250);
+			return;
+		}
+		this._registerToolbarNode(aToolbar, aExistingChildren);
+		
+		// the nodes insertion seems to fall somewhere between oveflow being initialized already but not listening to onOverflow events apparently
+		if(aToolbar.overflowable
+		&& (aToolbar.customizationTarget.scrollLeftMax > 0 || aToolbar.customizationTarget.scrollTopMax > 0)
+		&& !trueAttribute(aToolbar, 'overflowing')) {
+			aToolbar.overflowable.onOverflow();
+		}
 	}
 };
 
@@ -2004,6 +1998,10 @@ moduleAid.LOADMODULE = function() {
 	browserMediator.register(overlayAid.closedBrowser, 'pagehide');
 	browserMediator.register(overlayAid.closedBrowser, 'SidebarClosed');
 	observerAid.add(overlayAid.observingSchedules, 'window-overlayed');
+	
+	// toolbar nodes can't be registered before they're appended to the DOM, otherwise all hell breaks loose
+	CUIBackstage.CustomizableUIInternal._registerToolbarNode = CUIBackstage.CustomizableUIInternal.registerToolbarNode;
+	CUIBackstage.CustomizableUIInternal.registerToolbarNode = overlayAid.registerToolbarNode;
 };
 
 moduleAid.UNLOADMODULE = function() {
@@ -2015,6 +2013,9 @@ moduleAid.UNLOADMODULE = function() {
 	browserMediator.unregister(overlayAid.closedBrowser, 'SidebarClosed');
 	windowMediator.callOnAll(overlayAid.unloadAll);
 	browserMediator.callOnAll(overlayAid.unloadBrowser);
+	
+	CUIBackstage.CustomizableUIInternal.registerToolbarNode = CUIBackstage.CustomizableUIInternal._registerToolbarNode;
+	delete CUIBackstage.CustomizableUIInternal._registerToolbarNode;
 	
 	delete Globals.widgets;
 };
