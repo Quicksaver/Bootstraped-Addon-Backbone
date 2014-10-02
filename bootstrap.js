@@ -29,7 +29,7 @@
 // Note: Firefox 30 is the minimum version supported as the modules assume we're in a version with Australis already,
 // along with a minor assumption in overlayAid about a small change introduced to CustomizableUI in FF30.
 
-let bootstrapVersion = '1.4.5';
+let bootstrapVersion = '1.4.6';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -51,10 +51,15 @@ XPCOMUtils.defineLazyModuleGetter(this, "PluralForm", "resource://gre/modules/Pl
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils", "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Promise", "resource://gre/modules/Promise.jsm");
 
-// Note: defining the localStore lazy getter on the Services object causes a ZC if it's never called.
+// PlacesUIUtils can be removed in FF34 as well (not inside conditional because let only sets it within the conditional)
 let PlacesUIUtils = {};
-XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF", "@mozilla.org/rdf/rdf-service;1", "nsIRDFService");
-XPCOMUtils.defineLazyGetter(PlacesUIUtils, "localStore", function() { return PlacesUIUtils.RDF.GetDataSource("rdf:local-store"); });
+if(Services.vc.compare(Services.appinfo.version, "34.0a1") >= 0) {
+	XPCOMUtils.defineLazyServiceGetter(Services, "xulStore", "@mozilla.org/xul/xulstore;1", "nsIXULStore");
+} else {
+	// Note: defining the localStore lazy getter on the Services object causes a ZC if it's never called.
+	XPCOMUtils.defineLazyServiceGetter(PlacesUIUtils, "RDF", "@mozilla.org/rdf/rdf-service;1", "nsIRDFService");
+	XPCOMUtils.defineLazyGetter(PlacesUIUtils, "localStore", function() { return PlacesUIUtils.RDF.GetDataSource("rdf:local-store"); });
+}
 
 XPCOMUtils.defineLazyServiceGetter(Services, "fuel", "@mozilla.org/fuel/application;1", "fuelIApplication");
 XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");

@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.11.7';
+moduleAid.VERSION = '2.11.8';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -254,6 +254,7 @@ this.overlayAid = {
 		}
 	},
 	
+	// not needed anymore in FF34
 	isPersist: function(overlay, id, attr) {
 		if(!id && !attr) {
 			for(var x in overlay.persist) {
@@ -272,6 +273,20 @@ this.overlayAid = {
 	},
 	
 	persistOverlay: function(aWindow, overlay) {
+		// Firefox 34 introduces a new persistence system, through xulStore.
+		if(Services.vc.compare(Services.appinfo.version, "34.0a1") >= 0) {
+			for(var id in overlay.persist) {
+				for(var attr in overlay.persist[id]) {
+					var stored = Services.xulStore.getValue(aWindow.document.baseURI, id, attr);
+					if(stored) {
+						var node = aWindow.document.getElementById(id);
+						setAttribute(node, attr, stored);
+					}
+				}
+			}
+			return;
+		}
+			
 		if(!this.isPersist(overlay)) {
 			return;
 		}
