@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.12.0';
+moduleAid.VERSION = '2.12.1';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -1973,6 +1973,7 @@ this.overlayAid = {
 		toggleAttribute(aWindow.document.documentElement, 'Bootstrapped_Overlays', attr.length > 0, attr.join(' '));
 	},
 	
+	// toolbar nodes can't be registered before they're appended to the DOM, otherwise all hell breaks loose
 	registerToolbarNode: function(aToolbar, aExistingChildren) {
 		if(!aToolbar || !aToolbar.id || !aToolbar.ownerDocument.getElementById(aToolbar.id)) {
 			aSync(function() { CustomizableUI.registerToolbarNode(aToolbar, aExistingChildren); }, 250);
@@ -1981,9 +1982,7 @@ this.overlayAid = {
 		this._registerToolbarNode(aToolbar, aExistingChildren);
 		
 		// the nodes insertion seems to fall somewhere between oveflow being initialized already but not listening to onOverflow events apparently
-		if(aToolbar.overflowable
-		&& (aToolbar.customizationTarget.scrollLeftMax > 0 || aToolbar.customizationTarget.scrollTopMax > 0)
-		&& !trueAttribute(aToolbar, 'overflowing')) {
+		if(aToolbar.overflowable && aToolbar.customizationTarget.scrollLeftMax > 0 && !trueAttribute(aToolbar, 'overflowing')) {
 			aToolbar.overflowable.onOverflow();
 		}
 	}
@@ -1999,7 +1998,6 @@ moduleAid.LOADMODULE = function() {
 	browserMediator.register(overlayAid.closedBrowser, 'SidebarClosed');
 	observerAid.add(overlayAid.observingSchedules, 'window-overlayed');
 	
-	// toolbar nodes can't be registered before they're appended to the DOM, otherwise all hell breaks loose
 	CUIBackstage.CustomizableUIInternal._registerToolbarNode = CUIBackstage.CustomizableUIInternal.registerToolbarNode;
 	CUIBackstage.CustomizableUIInternal.registerToolbarNode = overlayAid.registerToolbarNode;
 };
