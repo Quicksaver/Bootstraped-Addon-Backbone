@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.12.1';
+moduleAid.VERSION = '2.12.2';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -14,7 +14,7 @@ moduleAid.UTILS = true;
 // The overlay element surrounds the overlay content. It uses the same namespace as XUL window files. The id of these items should exist in the window's content.
 // Its content will be added to the window where a similar element exists with the same id value. If such an element does not exist, that part of the overlay is ignored.
 // If there is content inside both the XUL window and in the overlay, the window's content will be used as is and the overlay's content will be appended to the end.
-// The children of the overlay's element are inserted as children of the base window's element.
+// The children of the overlay's element are inserted as children of the base window's element. The following attributes are processed in the order they are declared in the overlay:
 //	If the overlay's element contains an insertbefore attribute, the element is added just before the element in the base window with the id that matches the value of this attribute.
 //	If the overlay's element contains an insertafter attribute, the element is added just after the element in the base window with the id that matches the value of this attribute.
 //	If the overlay's element contains an position attribute, the element is added at the one-based index specified in this attribute.
@@ -1489,40 +1489,46 @@ this.overlayAid = {
 			if(newParent) { parent = newParent; }
 		}
 		
-		if(overlayNode.getAttribute('insertbefore')) {
-			var idList = overlayNode.getAttribute('insertbefore').split(',');
-			for(var i of idList) {
-				var id = trim(i);
-				if(id == '') { continue; }
-				if(id == node.id) { continue; } // this is just stupid of course...
-				
-				for(var c of parent.childNodes) {
-					if(c.id == id) {
-						return this.insertBefore(aWindow, node, parent, c);
+		for(var attr of overlayNode.attributes) {
+			switch(attr.name) {
+				case 'insertbefore':
+					var idList = attr.value.split(',');
+					for(var i of idList) {
+						var id = trim(i);
+						if(id == '') { continue; }
+						if(id == node.id) { continue; } // this is just stupid of course...
+						
+						for(var c of parent.childNodes) {
+							if(c.id == id) {
+								return this.insertBefore(aWindow, node, parent, c);
+							}
+						}
 					}
-				}
-			}
-		}
-		
-		if(overlayNode.getAttribute('insertafter')) {
-			var idList = overlayNode.getAttribute('insertafter').split(',');
-			for(var i of idList) {
-				var id = trim(i);
-				if(id == '') { continue; }
-				if(id == node.id) { continue; } // this is just stupid of course...
+					break;
 				
-				for(var c of parent.childNodes) {
-					if(c.id == id) {
-						return this.insertBefore(aWindow, node, parent, c.nextSibling);
+				case 'insertafter':
+					var idList = attr.value.split(',');
+					for(var i of idList) {
+						var id = trim(i);
+						if(id == '') { continue; }
+						if(id == node.id) { continue; } // this is just stupid of course...
+						
+						for(var c of parent.childNodes) {
+							if(c.id == id) {
+								return this.insertBefore(aWindow, node, parent, c.nextSibling);
+							}
+						}
 					}
-				}
+					break;
+				
+				case 'position':
+					var position = parseInt(attr.value) -1; // one-based children list
+					var sibling = (position < parent.childNodes.length) ? parent.childNodes[position] : null;
+					return this.insertBefore(aWindow, node, parent, sibling);
+					break;
+				
+				default: break;
 			}
-		}
-		
-		if(overlayNode.getAttribute('position')) {
-			var position = parseInt(overlayNode.getAttribute('position')) -1; // one-based children list
-			var sibling = (position < parent.childNodes.length) ? parent.childNodes[position] : null;
-			return this.insertBefore(aWindow, node, parent, sibling);
 		}
 		
 		if(!node.parentNode || newParent) {
