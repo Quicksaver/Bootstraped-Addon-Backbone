@@ -1,4 +1,4 @@
-moduleAid.VERSION = '2.12.2';
+moduleAid.VERSION = '2.12.3';
 moduleAid.UTILS = true;
 
 // overlayAid - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -755,6 +755,17 @@ this.overlayAid = {
 					
 					case 'addToolbar':
 						if(action.node) {
+							// the browser adds this automatically but doesn't remove it
+							if(action.toolboxid) {
+								var toolbox = aWindow.document.getElementById(action.toolboxid);
+								if(toolbox) {
+									var et = toolbox.externalToolbars.indexOf(action.node);
+									if(et > -1) {
+										toolbox.externalToolbars.splice(et, 1);
+									}
+								}
+							}
+							
 							aWindow.removeEventListener('unload', action.node._menuEntries.onClose);
 							
 							// remove the context menu entries associated with this toolbar
@@ -1459,6 +1470,7 @@ this.overlayAid = {
 			this.traceBack(aWindow, {
 				action: 'addToolbar',
 				node: node,
+				toolboxid: node.getAttribute('toolboxid'),
 				palette: palette
 			});
 		}
@@ -2004,8 +2016,7 @@ moduleAid.LOADMODULE = function() {
 	browserMediator.register(overlayAid.closedBrowser, 'SidebarClosed');
 	observerAid.add(overlayAid.observingSchedules, 'window-overlayed');
 	
-	CUIBackstage.CustomizableUIInternal._registerToolbarNode = CUIBackstage.CustomizableUIInternal.registerToolbarNode;
-	CUIBackstage.CustomizableUIInternal.registerToolbarNode = overlayAid.registerToolbarNode;
+	CUIAid.modify('registerToolbarNode', overlayAid.registerToolbarNode);
 };
 
 moduleAid.UNLOADMODULE = function() {
@@ -2018,8 +2029,7 @@ moduleAid.UNLOADMODULE = function() {
 	windowMediator.callOnAll(overlayAid.unloadAll);
 	browserMediator.callOnAll(overlayAid.unloadBrowser);
 	
-	CUIBackstage.CustomizableUIInternal.registerToolbarNode = CUIBackstage.CustomizableUIInternal._registerToolbarNode;
-	delete CUIBackstage.CustomizableUIInternal._registerToolbarNode;
+	CUIAid.revert('registerToolbarNode');
 	
 	delete Globals.widgets;
 };

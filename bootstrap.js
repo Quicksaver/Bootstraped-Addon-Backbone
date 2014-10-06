@@ -29,7 +29,7 @@
 // Note: Firefox 30 is the minimum version supported as the modules assume we're in a version with Australis already,
 // along with a minor assumption in overlayAid about a small change introduced to CustomizableUI in FF30.
 
-let bootstrapVersion = '1.5.1';
+let bootstrapVersion = '1.6.0';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -64,42 +64,6 @@ if(Services.vc.compare(Services.appinfo.version, "34.0a1") >= 0) {
 XPCOMUtils.defineLazyServiceGetter(Services, "fuel", "@mozilla.org/fuel/application;1", "fuelIApplication");
 XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");
 XPCOMUtils.defineLazyServiceGetter(Services, "stylesheet", "@mozilla.org/content/style-sheet-service;1", "nsIStyleSheetService");
-
-// there are a few things in CUI that need to be overriden, e.g. the toolbars would register before they were appended to the DOM tree, which is really bad...
-var _CUIInited = false;
-this.__defineGetter__('CustomizableUI', function() { lazyCUI(); return CustomizableUI; });
-this.__defineGetter__('CUIBackstage', function() { lazyCUI(); return CUIBackstage; });
-function lazyCUI() {
-	_CUIInited = true;
-	delete this.CustomizableUI;
-	delete this.CUIBackstage;
-	this.CUIBackstage = Cu.import("resource:///modules/CustomizableUI.jsm");
-	
-	if(!CUIBackstage.__CustomizableUIInternal) {
-		CUIBackstage.__CustomizableUIInternal = CUIBackstage.CustomizableUIInternal;
-	
-		var CUIInternalNew = {};
-		for(var p in CUIBackstage.CustomizableUIInternal) {
-			if(CUIBackstage.CustomizableUIInternal.hasOwnProperty(p)) {
-				var propGetter = CUIBackstage.CustomizableUIInternal.__lookupGetter__(p);
-				if(propGetter) {
-					CUIInternalNew.__defineGetter__(p, propGetter);
-				} else {
-					CUIInternalNew[p] = CUIBackstage.CustomizableUIInternal[p];
-				}
-			}
-		}
-		CUIBackstage.CustomizableUIInternal = CUIInternalNew;
-	}
-	
-	if(!CUIBackstage.__modBackboneIds) {
-		CUIBackstage.__modBackboneIds = objName;
-	} else {
-		var ex = CUIBackstage.__modBackboneIds.split(' ');
-		ex.push(objName);
-		CUIBackstage.__modBackboneIds = ex.join(' ');
-	}
-}
 
 // I check these pretty much everywhere, so might as well keep a single reference to them
 let WINNT = Services.appinfo.OS == 'WINNT';
@@ -295,19 +259,6 @@ function shutdown(aData, aReason) {
 		closeOptions();
 		if(typeof(onShutdown) == 'function') {
 			onShutdown(aData, aReason);
-		}
-	}
-	
-	// we really need to put this back!
-	if(_CUIInited && CUIBackstage.__modBackboneIds.indexOf(objName) > -1) {
-		var ex = CUIBackstage.__modBackboneIds.split(' ');
-		ex.splice(ex.indexOf(objName), 1);
-		CUIBackstage.__modBackboneIds = ex.join(' ');
-		
-		if(!CUIBackstage.__modBackboneIds) {
-			CUIBackstage.CustomizableUIInternal = CUIBackstage.__CustomizableUIInternal;
-			delete CUIBackstage.__CustomizableUIInternal;
-			delete CUIBackstage.__modBackboneIds;
 		}
 	}
 	
