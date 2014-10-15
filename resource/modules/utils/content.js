@@ -34,11 +34,17 @@ this. = {
 	
 	initialized: false,
 	
-	version: '1.2.0',
+	version: '1.2.1',
 	Scope: this, // to delete our variable on shutdown later
 	get document () { return content.document; },
 	$: function(id) { return content.document.getElementById(id); },
 	$$: function(sel) { return content.document.querySelectorAll(sel); },
+	
+	// easy and useful helpers for when I'm debugging
+	LOG: function(str) {
+		if(!str) { str = typeof(str)+': '+str; }
+		this.console.log(this.objName+' '+' :: CONTENT :: '+str);
+	},
 	
 	// some local things
 	AddonData: {},
@@ -57,6 +63,7 @@ this. = {
 		this.DARWIN = Services.appinfo.OS == 'Darwin';
 		this.LINUX = Services.appinfo.OS != 'WINNT' && Services.appinfo.OS != 'Darwin';
 		
+		XPCOMUtils.defineLazyModuleGetter(this, "console", "resource://gre/modules/devtools/Console.jsm");
 		XPCOMUtils.defineLazyModuleGetter(this.Scope, "PluralForm", "resource://gre/modules/PluralForm.jsm");
 		XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");
 		
