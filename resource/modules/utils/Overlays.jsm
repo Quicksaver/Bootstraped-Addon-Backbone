@@ -1,4 +1,4 @@
-Modules.VERSION = '2.13.1';
+Modules.VERSION = '2.13.2';
 Modules.UTILS = true;
 
 // Overlays - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -1693,9 +1693,10 @@ this.Overlays = {
 						innerDone.unshift({ // unshift instead of push so we undo in the reverse order
 							sibling: inner.nextSibling,
 							parent: inner.parentNode,
-							browser: inner.remove(),
+							browser: inner,
 							temp: newTemp
 						});
+						inner.remove();
 					}
 				}
 				
@@ -1729,10 +1730,11 @@ this.Overlays = {
 						iframesDone.unshift({ // unshift instead of push so we undo in the reverse order
 							sibling: iframe.nextSibling,
 							parent: iframe.parentNode,
-							browser: iframe.remove(),
+							browser: iframe,
 							iframe: true,
 							temp: newTemp
 						});
+						iframe.remove();
 					}
 				}
 				
@@ -1777,26 +1779,26 @@ this.Overlays = {
 	// remove all traces of all of these swaps
 	cleanTempBrowsers: function(list) {
 		if(!list) { return; }
-		for(var l=0; l<list.length; l++) {
-			if(list[l].focusedElement) {
-				list[l].focusedElement.focus();
+		for(var l of list) {
+			if(l.focusedElement) {
+				l.focusedElement.focus();
 				continue;
 			}
 			
-			if(list[l].parent) {
-				list[l].parent.insertBefore(list[l].browser, list[l].sibling);
+			if(l.parent) {
+				l.parent.insertBefore(l.browser, l.sibling);
 			}
 			
 			try {
-				if(!list[l].iframe) {
-					this.setTempBrowsersListeners(list[l].temp);
-					list[l].browser.swapDocShells(list[l].temp);
+				if(!l.iframe) {
+					this.setTempBrowsersListeners(l.temp);
+					l.browser.swapDocShells(l.temp);
 				}
-				else { list[l].browser.QueryInterface(Ci.nsIFrameLoaderOwner).swapFrameLoaders(list[l].temp); }
+				else { l.browser.QueryInterface(Ci.nsIFrameLoaderOwner).swapFrameLoaders(l.temp); }
 			}
 			catch(ex) { /* nothing we can do at this point */  }
 			
-			list[l].temp.remove();
+			l.temp.remove();
 		}
 	},
 	
