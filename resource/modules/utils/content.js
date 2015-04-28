@@ -34,7 +34,8 @@ this. = {
 	
 	initialized: false,
 	
-	version: '1.3.0',
+	version: '1.3.1',
+	isContent: true,
 	Scope: this, // to delete our variable on shutdown later
 	get document () { return content.document; },
 	$: function(id) { return content.document.getElementById(id); },

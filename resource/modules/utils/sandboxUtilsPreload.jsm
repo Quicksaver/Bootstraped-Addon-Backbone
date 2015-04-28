@@ -1,4 +1,4 @@
-// VERSION = '1.0.2'
+// VERSION = '1.0.3'
 
 // Strings - use for getting strings out of bundles from .properties locale files
 this.__defineGetter__('Strings', function() { delete this.Strings; Modules.load('utils/Strings'); return Strings; });
@@ -44,6 +44,16 @@ this.trueAttribute = function(obj, attr) { loadAttributesTools(); return trueAtt
 
 // innerText() - returns the equivalent of IE's .innerText property of node; essentially returns .textContent without the script tags
 this.innerText = function(node) { loadHTMLElementsTools(); return innerText(node); };
+
+// Piggyback - This module allows me to Piggyback methods of any object. It also gives me access to the CustomizableUI module backstage pass, so I can do the same to it.
+if(this.isChrome) {
+	this.__defineGetter__('Piggyback', function() { delete this.Piggyback; delete this.CustomizableUI; delete this.CUIBackstage; Modules.load('utils/Piggyback'); return Piggyback; });
+	this.__defineGetter__('CustomizableUI', function() { delete this.Piggyback; delete this.CustomizableUI; delete this.CUIBackstage; Modules.load('utils/Piggyback'); return CustomizableUI; });
+	this.__defineGetter__('CUIBackstage', function() { delete this.Piggyback; delete this.CustomizableUI; delete this.CUIBackstage; Modules.load('utils/Piggyback'); return CUIBackstage; });
+}
+if(this.isContent) {
+	this.__defineGetter__('Piggyback', function() { delete this.Piggyback; Modules.load('utils/Piggyback'); return Piggyback; });
+}
 
 this.loadSandboxTools = function() {
 	delete this.xmlHttpRequest;

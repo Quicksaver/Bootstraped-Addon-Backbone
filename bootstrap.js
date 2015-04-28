@@ -29,7 +29,7 @@
 // Note: Firefox 34 is the minimum version supported as the modules assume we're in a version with Australis already,
 // along with xulStore already implemented, in detriment of localstore.rdf.
 
-let bootstrapVersion = '1.7.2';
+let bootstrapVersion = '1.7.3';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -37,6 +37,7 @@ let AddonData = null;
 let observerLOADED = false;
 let onceListeners = [];
 let alwaysRunOnShutdown = [];
+let isChrome = true;
 
 // Globals - lets me use objects that I can share through all the windows
 let Globals = {};
