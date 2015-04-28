@@ -34,7 +34,7 @@ this. = {
 	
 	initialized: false,
 	
-	version: '1.3.1',
+	version: '1.3.2',
 	isContent: true,
 	Scope: this, // to delete our variable on shutdown later
 	get document () { return content.document; },
@@ -69,6 +69,8 @@ this. = {
 		// AddonManager can't be used in child processes!
 		XPCOMUtils.defineLazyModuleGetter(this, "console", "resource://gre/modules/devtools/Console.jsm");
 		XPCOMUtils.defineLazyModuleGetter(this.Scope, "PluralForm", "resource://gre/modules/PluralForm.jsm");
+		XPCOMUtils.defineLazyModuleGetter(this.Scope, "Promise", "resource://gre/modules/Promise.jsm");
+		XPCOMUtils.defineLazyModuleGetter(this.Scope, "Task", "resource://gre/modules/Task.jsm");
 		XPCOMUtils.defineLazyServiceGetter(Services, "navigator", "@mozilla.org/network/protocol;1?name=http", "nsIHttpProtocolHandler");
 		
 		this.webProgress = docShell.QueryInterface(Ci.nsIInterfaceRequestor).getInterface(Ci.nsIWebProgress);

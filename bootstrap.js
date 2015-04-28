@@ -29,7 +29,7 @@
 // Note: Firefox 34 is the minimum version supported as the modules assume we're in a version with Australis already,
 // along with xulStore already implemented, in detriment of localstore.rdf.
 
-let bootstrapVersion = '1.7.3';
+let bootstrapVersion = '1.7.4';
 let UNLOADED = false;
 let STARTED = false;
 let Addon = {};
@@ -51,6 +51,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "PlacesUtils", "resource://gre/modules/P
 XPCOMUtils.defineLazyModuleGetter(this, "PluralForm", "resource://gre/modules/PluralForm.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "PrivateBrowsingUtils", "resource://gre/modules/PrivateBrowsingUtils.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "Promise", "resource://gre/modules/Promise.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "Task", "resource://gre/modules/Task.jsm");
 
 // easy and useful helpers for when I'm debugging
 XPCOMUtils.defineLazyModuleGetter(this, "console", "resource://gre/modules/devtools/Console.jsm");
