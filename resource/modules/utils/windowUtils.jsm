@@ -1,4 +1,4 @@
-Modules.VERSION = '2.4.0';
+Modules.VERSION = '2.4.1';
 Modules.UTILS = true;
 Modules.CLEAN = false;
 
@@ -59,8 +59,8 @@ Modules.LOADMODULE = function() {
 		
 		// We don't use alwaysRunOnClose directly because removeObject() destroys it
 		var tempArr = [];
-		for(var i=0; i<alwaysRunOnClose.length; i++) {
-			tempArr.push(alwaysRunOnClose[i]);
+		for(let aRun of alwaysRunOnClose) {
+			tempArr.push(aRun);
 		}
 		
 		while(tempArr.length > 0) {
