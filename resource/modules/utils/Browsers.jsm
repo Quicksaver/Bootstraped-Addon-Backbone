@@ -1,4 +1,4 @@
-Modules.VERSION = '2.3.0';
+Modules.VERSION = '2.3.1';
 Modules.UTILS = true;
 
 // Browsers - Aid object to track and perform tasks on all document browsers across the windows.
@@ -33,7 +33,7 @@ this.Browsers = {
 					var aBrowser = aWindow.gBrowser.getBrowserAtIndex(b);
 					
 					// e10s fix, we don't check remote tabs
-					if(trueAttribute(aBrowser, 'remote')) { continue; }
+					if(aBrowser.isRemoteBrowser) { continue; }
 					
 					if(!aURI || aBrowser.contentDocument.documentURI == aURI) {
 						if(aBrowser.contentDocument.readyState == "complete" || beforeComplete) {
@@ -117,11 +117,39 @@ this.Browsers = {
 		return false;
 	},
 	
+	tabNonRemote: function(tab) {
+		// The event can be DOMContentLoaded, pageshow, pagehide, load or unload. Don't use these in remote browsers as they use CPOWs to work there.
+		// These seem to be enough
+		tab.linkedBrowser.addEventListener('pageshow', Browsers.callWatchers, true);
+		tab.linkedBrowser.addEventListener('pagehide', Browsers.callWatchers, true);
+	},
+	
+	tabRemote: function(tab) {
+		tab.linkedBrowser.removeEventListener('pageshow', Browsers.callWatchers, true);
+		tab.linkedBrowser.removeEventListener('pagehide', Browsers.callWatchers, true);
+	},
+	
+	tabRemotenessChanged: function(e) {
+		if(e.target.linkedBrowser.isRemoteBrowser) {
+			Browsers.tabRemote(e.target);
+		} else {
+			Browsers.tabNonRemote(e.target);
+		}
+	},
+	
+	tabOpened: function(e) {
+		e.target.addEventListener('TabRemotenessChange', Browsers.tabRemotenessChanged);
+		Browsers.tabRemotenessChanged(e);
+	},
+	
 	// pagehide and unload by themselves don't catch everything, this completes it
 	tabClosed: function(e) {
-		// e10s fix, we don't check remote tabs, we only check about: and chrome:// tabs
-		if(trueAttribute(e.target.linkedBrowser, 'remote')) { return; }
+		e.target.removeEventListener('TabRemotenessChange', Browsers.tabRemotenessChanged);
 		
+		// e10s fix, we don't check remote tabs, we only check about: and chrome:// tabs
+		if(e.target.linkedBrowser.isRemoteBrowser) { return; }
+		
+		Browsers.tabRemote(e.target); // this removes the listeners, which is what we want to do
 		Browsers.callWatchers({
 			type: 'pagehide',
 			originalTarget: e.target.linkedBrowser.contentDocument
@@ -142,11 +170,11 @@ this.Browsers = {
 		}
 		
 		if(aWindow.gBrowser) {
-			// The event can be DOMContentLoaded, pageshow, pagehide, load or unload.
-			// These seem to be enough
-			aWindow.gBrowser.addEventListener('pageshow', Browsers.callWatchers, true);
-			aWindow.gBrowser.addEventListener('pagehide', Browsers.callWatchers, true);
+			for(var tab of aWindow.gBrowser.mTabs) {
+				Browsers.tabOpened({ target: tab });
+			}
 			// The event can be TabOpen, TabClose, TabSelect, TabShow, TabHide, TabPinned, TabUnpinned and possibly more.
+			aWindow.gBrowser.tabContainer.addEventListener('TabOpen', Browsers.tabOpened, true);
 			aWindow.gBrowser.tabContainer.addEventListener('TabClose', Browsers.tabClosed, true);
 			// Also listen for the sidebars
 			aWindow.addEventListener('SidebarFocused', Browsers.sidebarLoaded, true);
@@ -156,8 +184,13 @@ this.Browsers = {
 	
 	forgetWindow: function(aWindow) {
 		if(aWindow.document.readyState == 'complete' && aWindow.gBrowser) {
-			aWindow.gBrowser.removeEventListener('pageshow', Browsers.callWatchers, true);
-			aWindow.gBrowser.removeEventListener('pagehide', Browsers.callWatchers, true);
+			for(var tab of aWindow.gBrowser.mTabs) {
+				tab.removeEventListener('TabRemotenessChange', Browsers.tabRemotenessChanged);
+				if(!tab.linkedBrowser.isRemoteBrowser) {
+					Browsers.tabRemote(tab); // this removes the listeners, which is what we want to do
+				}
+			}
+			aWindow.gBrowser.tabContainer.removeEventListener('TabOpen', Browsers.tabOpened, true);
 			aWindow.gBrowser.tabContainer.removeEventListener('TabClose', Browsers.tabClosed, true);
 			aWindow.removeEventListener('SidebarFocused', Browsers.sidebarLoaded, true);
 			aWindow.removeEventListener('SidebarClosed', Browsers.sidebarLoaded, true);
