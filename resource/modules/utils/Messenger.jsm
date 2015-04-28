@@ -1,4 +1,4 @@
-Modules.VERSION = '1.3.0';
+Modules.VERSION = '1.3.1';
 Modules.UTILS = true;
 
 // Messenger - 	Aid object to communicate with browser content scripts (e10s).
@@ -163,7 +163,7 @@ this.Messenger = {
 			oldVersion: AddonData.oldVersion,
 			newVersion: AddonData.newVersion
 		};	
-		Messenger.messageBrowser(m.target, 'init', JSON.stringify(carryData));
+		Messenger.messageBrowser(m.target, 'init', carryData);
 		
 		// carry the preferences current values into content
 		var current = {};
@@ -184,6 +184,9 @@ this.Messenger = {
 				Messenger.messageBrowser(m.target, 'load', module);
 			}
 		}
+		
+		// now we can load other individual modules that have been queued in the meantime (between window opening and content process finishing to initialize)
+		Messenger.messageBrowser(m.target, 'loadQueued');
 	},
 	
 	carryPref: function(pref, val) {
