@@ -1,4 +1,4 @@
-Modules.VERSION = '2.2.0';
+Modules.VERSION = '2.2.1';
 Modules.UTILS = true;
 Modules.BASEUTILS = true;
 
@@ -33,7 +33,7 @@ this.Observers = {
 		
 		var i = this.observers.push({ topic: aTopic, observer: observer }) -1;
 		Services.obs.addObserver(this.observers[i].observer, aTopic, ownsWeak);
-		return true;
+		return this.observers[i];
 	},
 	
 	remove: function(anObserver, aTopic) {
@@ -42,8 +42,9 @@ this.Observers = {
 		var i = this.observing(observer, aTopic);
 		if(i !== false) {
 			Services.obs.removeObserver(this.observers[i].observer, this.observers[i].topic);
+			var ret = this.observers[i];
 			this.observers.splice(i, 1);
-			return true;
+			return ret;
 		}
 		return false;
 	},

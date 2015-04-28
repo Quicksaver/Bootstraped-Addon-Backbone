@@ -5,7 +5,9 @@ this.self = this;
 // Modules - Helper to load subscripts into the context of "this"
 // load(aModule, delayed) - loads aModule onto the context of self
 //	aModule - (string) can be either module name which loads resource://objPathString/modules/aModule.jsm or full module path
-//	(optional) delayed - true loads module 500ms later in an asychronous process, false loads immediatelly synchronously, defaults to false
+//	(optional) delayed -	true loads module 250ms later in an asychronous process, false loads immediatelly synchronously, defaults to false
+//				if instead, a gBrowserInit object is provided, the module load will wait until the window's delayed load notification, or load immediately if that's
+//				already happened.
 // unload(aModule) - unloads aModule from the context of self
 //	see load()
 // loadIf(aModule, anIf, delayed) - conditionally load or unload aModule
@@ -23,7 +25,7 @@ this.self = this;
 //				so that they only unload on the very end; like above, should only be used in backbone modules
 //	Modules.CLEAN - (bool) if false, this module won't be removed by clean(); defaults to true
 this.Modules = {
-	version: '2.4.0',
+	version: '2.5.0',
 	modules: [],
 	moduleVars: {},
 	
@@ -107,7 +109,7 @@ this.Modules = {
 		}
 		
 		if(this.modules[i].load) {
-			if(!delayed) {
+			if(!delayed || delayed.delayedStartupFinished) {
 				try { this.modules[i].load(); }
 				catch(ex) {
 					Cu.reportError(ex);
@@ -116,20 +118,31 @@ this.Modules = {
 				}
 				this.modules[i].loaded = true;
 			} else {
-				this.modules[i].aSync = aSync(function() {
+				this.modules[i]._aSync = () => {
 					if(typeof(Modules) == 'undefined') { return; } // when disabling the add-on before it's had time to perform the load call
 					
-					try {
-						Modules.modules[i].load();
-					}
+					try { this.modules[i].load(); }
 					catch(ex) {
 						Cu.reportError(ex);
-						Modules.unload(aModule, true);
+						this.unload(aModule, true);
 						return;
 					}
-					delete Modules.modules[i].aSync;
-					Modules.modules[i].loaded = true; 
-				}, 250);
+					delete this.modules[i]._aSync;
+					delete this.modules[i].aSync;
+					this.modules[i].loaded = true; 
+				};
+				
+				// if we're delaying a load in a browser window, we should wait for it to finish the initial painting
+				if(typeof(delayed) == 'object' && "delayedStartupFinished" in delayed) {
+					this.modules[i].aSync = Observers.add((aSubject, aTopic) => {
+						if(aSubject.gBrowserInit == delayed) {
+							Observers.remove(this.modules[i].aSync, 'browser-delayed-startup-finished');
+							this.modules[i]._aSync();
+						}
+					}, 'browser-delayed-startup-finished');
+				} else {
+					this.modules[i].aSync = aSync(this.modules[i]._aSync, 250);
+				}
 			}
 		}
 		else {
