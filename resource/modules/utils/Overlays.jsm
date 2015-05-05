@@ -1,4 +1,4 @@
-Modules.VERSION = '2.14.4';
+Modules.VERSION = '2.15.0';
 Modules.UTILS = true;
 
 // Overlays - to use overlays in my bootstraped add-ons. The behavior is as similar to what is described in https://developer.mozilla.org/en/XUL_Tutorial/Overlays as I could manage.
@@ -9,9 +9,8 @@ Modules.UTILS = true;
 // Overlays can also have their own:
 //	stylesheets by placing at the top of the overlay: <?xml-stylesheet href="chrome://addon/skin/sheet.css" type="text/css"?>
 //	DTD's by the usual method: <!DOCTYPE window [ <!ENTITY % nameDTD SYSTEM "chrome://addon/locale/file.dtd"> %nameDTD; ]>
-//	scripts using the script tag when as a direct child of the overlay element (effects of these won't be undone when unloading the overlay, I have to 
-//		undo it in the onunload function passed to overlayURI() ). Any script that changes the DOM structure might produce unpredictable results!
-//		To avoid using eval unnecessarily, only scripts with src will be imported for now.
+//	scripts using the script tag when as a direct child of the overlay element (effects of these won't be automatically undone when unloading the overlay.
+//		Any script that changes the DOM structure might produce unpredictable results! To avoid using eval unnecessarily, only scripts with src will be imported for now.
 // 
 // The overlay element surrounds the overlay content. It uses the same namespace as XUL window files. The id of these items should exist in the window's content.
 // Its content will be added to the window where a similar element exists with the same id value. If such an element does not exist, that part of the overlay is ignored.
@@ -48,15 +47,16 @@ Modules.UTILS = true;
 // in the window during startup/load), you can set attribute "waitForSS" with space-separated list of stylesheet URIs for which the element should wait. The element will be collapsed
 // until all the stylesheets in the attribute are loaded.
 // 
-// overlayURI(aURI, aWith, beforeload, onload, onunload) - overlays aWith in all windows with aURI
+// overlayURI(aURI, aWith, aListener) - overlays aWith in all windows with aURI
 //	aURI - (string) uri to be overlayed
 //	aWith - (string) uri to overlay aURI, can be fileName found as chrome://objPathString/content/fileName.xul or already the full uri path
-//	(optional) beforeload ( function(window) ) is called before the window is overlayed, expects a (object) window argument
-//	(optional) onload - ( function(window) ) to be called when aURI is overlayed with aWith, expects a (object) window argument
-//	(optional) onunload - ( function(window) ) to be called when aWith is unloaded from aURI, expects a (object) window argument
+//	(optional) aListener - (object) with any of the following methods:
+//		beforeLoad - ( function(window) ) is called before the window is overlayed, expects a (object) window argument
+//		onLoad - ( function(window) ) to be called when aURI is overlayed with aWith, expects a (object) window argument
+//		onUnload - ( function(window) ) to be called when aWith is unloaded from aURI, expects a (object) window argument
 // removeOverlayURI(aURI, aWith) - removes aWith overlay from all windows with aURI
 //	see overlayURI()
-// overlayWindow(aWindow, aWith, beforeload, onload, onunload) - overlays aWindow with aWith
+// overlayWindow(aWindow, aWith, aListener) - overlays aWindow with aWith
 //	aWindow - (object) window object to be overlayed
 //	see overlayURI()
 // removeOverlayWindow(aWindow, aWith) - removes aWith overlay from aWindow
@@ -74,16 +74,14 @@ this.Overlays = {
 	_obj: '_OVERLAYS_'+objName,
 	overlays: [],
 	
-	overlayURI: function(aURI, aWith, beforeload, onload, onunload) {
+	overlayURI: function(aURI, aWith, aListener) {
 		var path = this.getPath(aWith);
 		if(!path || this.loadedURI(aURI, path) !== false) { return; }
 		
 		var newOverlay = {
 			uri: aURI,
 			overlay: path,
-			beforeload: beforeload || null,
-			onload: onload || null,
-			onunload: onunload || null,
+			listener: aListener || {},
 			document: null,
 			ready: false,
 			persist: {}
@@ -150,7 +148,7 @@ this.Overlays = {
 		});
 	},
 	
-	overlayWindow: function(aWindow, aWith, beforeload, onload, onunload) {
+	overlayWindow: function(aWindow, aWith, aListener) {
 		var path = this.getPath(aWith);
 		if(!path || this.loadedWindow(aWindow, path) !== false) { return; }
 		
@@ -159,9 +157,7 @@ this.Overlays = {
 			traceBack: [],
 			removeMe: function() { Overlays.removeOverlay(aWindow, this); },
 			time: 0,
-			beforeload: beforeload || null,
-			onload: onload || null,
-			onunload: onunload || null,
+			listener: aListener || {},
 			document: null,
 			ready: false,
 			loaded: false,
@@ -199,7 +195,7 @@ this.Overlays = {
 				}
 				
 				replaceObjStrings(overlay.document);
-				Overlays.cleanXUL(overlay.document, overlay);
+				this.cleanXUL(overlay.document, overlay);
 				overlay.ready = true;
 				this.scheduleAll(aWindow);
 			}
@@ -549,8 +545,8 @@ this.Overlays = {
 		}
 		if(i == -1) { return; } 
 		
-		if(overlay.loaded && overlay.onunload) {
-			try { overlay.onunload(aWindow); }
+		if(overlay.loaded && overlay.listener.onUnload) {
+			try { overlay.listener.onUnload(aWindow); }
 			catch(ex) { Cu.reportError(ex); }
 		}
 		
@@ -903,7 +899,7 @@ this.Overlays = {
 					removeMe: function() { Overlays.removeOverlay(aWindow, this); },
 					time: 0,
 					loaded: false,
-					onunload: x.onunload
+					listener: x.listener
 				};
 				aWindow[this._obj].push(aWindow._BEING_OVERLAYED);
 				
@@ -929,8 +925,8 @@ this.Overlays = {
 	},
 	
 	overlayDocument: function(aWindow, overlay) {
-		if(overlay.beforeload) {
-			try { overlay.beforeload(aWindow); }
+		if(overlay.listener.beforeLoad) {
+			try { overlay.listener.beforeLoad(aWindow); }
 			catch(ex) { Cu.reportError(ex); }
 		}
 		
@@ -956,8 +952,8 @@ this.Overlays = {
 		
 		this.persistOverlay(aWindow, overlay);
 		
-		if(overlay.onload) {
-			try { overlay.onload(aWindow); }
+		if(overlay.listener.onLoad) {
+			try { overlay.listener.onLoad(aWindow); }
 			catch(ex) { Cu.reportError(ex); }
 		}
 	},
