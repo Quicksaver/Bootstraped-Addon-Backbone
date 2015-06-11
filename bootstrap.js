@@ -3,6 +3,7 @@
 // This looks for file defaults.js in resource folder, expects:
 //	objName - (string) main object name for the add-on, to be added to window element
 //	objPathString - (string) add-on path name to use in URIs
+//	addonUUID = (string) used to register the add-on's about: uri; must be unique for each add-on! See http://www.famkruithof.net/uuid/uuidgen for generating one
 //	prefList - (object) { prefName: defaultValue } - add-on preferences
 //	paneList - (iterable) of array with a panes arguments to apply to PrefPanes.setList(); see PrefPanes.jsm
 //	addonUris - (object) containing any of the following string properties
@@ -53,7 +54,7 @@ let objName = null;
 let objPathString = null;
 let prefList = null;
 let paneList = null;
-let addonUUID = null; // should be unique for each add-on! See http://www.famkruithof.net/uuid/uuidgen for generating one
+let addonUUID = null;
 
 // add-on relevant links, to be overriden by defaults.js
 let addonUris = {
