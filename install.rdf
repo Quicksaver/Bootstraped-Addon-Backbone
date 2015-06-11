@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+	<Description about="urn:mozilla:install-manifest">
+		<em:id></em:id>
+		<em:type>2</em:type>
+		<em:version></em:version>
+		<em:creator></em:creator>
+		<em:optionsURL></em:optionsURL>
+		<em:optionsType>3</em:optionsType>
+		<em:iconURL></em:iconURL>
+		<em:homepageURL></em:homepageURL>
+		<em:name></em:name>
+		<em:bootstrap>true</em:bootstrap>
+		<em:multiprocessCompatible>true</em:multiprocessCompatible>
+		
+		<em:targetApplication>
+			<Description>
+				<em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id> <!-- Firefox -->
+				<em:minVersion>38.0</em:minVersion>
+				<em:maxVersion>41.0a1</em:maxVersion>
+			</Description>
+		</em:targetApplication>
+		
+		<em:localized>
+			<Description>
+				<em:locale>en-US</em:locale>
+				<em:name></em:name>
+				<em:description></em:description>
+			</Description>
+		</em:localized>
+	</Description>
+</RDF>

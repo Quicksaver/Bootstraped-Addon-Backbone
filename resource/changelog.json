@@ -1,0 +1,14 @@
+{
+	"current":"#.#.#",
+	"knownissues": [
+		["Known issue 1"]// , comma-separated
+	],
+	"releases": {
+		"#.#.#":{
+			"date":"Month Day, Year",
+			"notes":[
+				["new/changed/bugfix/removed/updated/general/{empty}","Issue"]// , comma-separated
+			]
+		}// , comma-separated
+	}
+}
