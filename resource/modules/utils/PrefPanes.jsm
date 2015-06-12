@@ -124,7 +124,7 @@ this.PrefPanes = {
 			sscode += '	#bank .hours { height: 100%; }\n';
 			sscode += '	#bank .balance { position: relative; height: 50%; top: 0.4em; }\n';
 			sscode += '}';
-			LOG(sscode);
+			
 			Styles.load('PrefPanesFix', sscode, true);
 		}
 	},
