@@ -1,4 +1,4 @@
-Modules.VERSION = '1.0.1';
+Modules.VERSION = '1.0.2';
 Modules.UTILS = true;
 
 // PrefPanes - handles the preferences tab and all its contents for the add-on
@@ -98,6 +98,17 @@ this.PrefPanes = {
 			Browsers.register(this, 'pageshow', this.aboutUri.spec);
 		}
 		
+		// current version of firefox has some display issues, this doesn't seem needed in the current Nightly (FF41+)
+		if(Services.vc.compare(Services.appinfo.version, '41.0a1') < 0) {
+			var sscode = '@namespace url(http://www.w3.org/1999/xhtml);\n';
+			sscode += '@-moz-document url("'+this.chromeUri+'")'+(this.aboutUri ? ', url("'+this.aboutUri.spec+'")' : '')+' {\n';
+			sscode += '	#bank .hours { height: 100%; }\n';
+			sscode += '	#bank .balance { position: relative; height: 50%; top: 0.4em; }\n';
+			sscode += '}';
+			
+			Styles.load('PrefPanesFix', sscode, true);
+		}
+		
 		// if we're in a dev version, ignore all this
 		if(AddonData.version.contains('a') || AddonData.version.contains('b')) { return; }
 		
@@ -116,25 +127,14 @@ this.PrefPanes = {
 		if(Prefs.lastVersionNotify != AddonData.version) {
 			Prefs.lastVersionNotify = AddonData.version;
 		}
-		
-		// current version of firefox has some display issues, this doesn't seem needed in the current Nightly (FF41+)
-		if(Services.vc.compare(Services.appinfo.version, '41.0a1') < 0) {
-			var sscode = '@namespace url(http://www.w3.org/1999/xhtml);\n';
-			sscode += '@-moz-document url("'+this.chromeUri+'")'+(this.aboutUri ? ', url("'+this.aboutUri.spec+'")' : '')+' {\n';
-			sscode += '	#bank .hours { height: 100%; }\n';
-			sscode += '	#bank .balance { position: relative; height: 50%; top: 0.4em; }\n';
-			sscode += '}';
-			
-			Styles.load('PrefPanesFix', sscode, true);
-		}
 	},
 	
 	uninit: function() {
-		Styles.unload('PrefPanesFix');
-		
 		Messenger.unloadFromAll('utils/api');
 		
 		this.closeAll();
+		
+		Styles.unload('PrefPanesFix');
 		
 		Browsers.unregister(this, 'pageshow', this.chromeUri);
 		
