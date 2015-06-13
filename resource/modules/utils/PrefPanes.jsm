@@ -1,4 +1,4 @@
-Modules.VERSION = '1.0.2';
+Modules.VERSION = '1.0.3';
 Modules.UTILS = true;
 
 // PrefPanes - handles the preferences tab and all its contents for the add-on
@@ -101,7 +101,7 @@ this.PrefPanes = {
 		// current version of firefox has some display issues, this doesn't seem needed in the current Nightly (FF41+)
 		if(Services.vc.compare(Services.appinfo.version, '41.0a1') < 0) {
 			var sscode = '@namespace url(http://www.w3.org/1999/xhtml);\n';
-			sscode += '@-moz-document url("'+this.chromeUri+'")'+(this.aboutUri ? ', url("'+this.aboutUri.spec+'")' : '')+' {\n';
+			sscode += '@-moz-document url-prefix("'+this.chromeUri+'")'+(this.aboutUri ? ', url-prefix("'+this.aboutUri.spec+'")' : '')+' {\n';
 			sscode += '	#bank .hours { height: 100%; }\n';
 			sscode += '	#bank .balance { position: relative; height: 50%; top: 0.4em; }\n';
 			sscode += '}';
@@ -170,6 +170,7 @@ this.PrefPanes = {
 			if(tab.linkedBrowser.currentURI.spec.startsWith(this.chromeUri)
 			|| (this.aboutUri && tab.linkedBrowser.currentURI.spec.startsWith(this.aboutUri.spec))) {
 				aWindow.gBrowser.selectedTab = tab;
+				aWindow.focus();
 				return;
 			}
 		}
@@ -182,6 +183,7 @@ this.PrefPanes = {
 		else {
 			aWindow.gBrowser.selectedTab = aWindow.gBrowser.addTab(this.aboutUri ? this.aboutUri.spec : this.chromeUri);
 		}
+		aWindow.focus();
 	},
 	
 	closeAll: function() {

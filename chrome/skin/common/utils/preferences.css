@@ -10,4 +10,16 @@ caption {
 	color: #484848;
 }
 
+/* nodes that aren't visible but should still occupy their space in the layout */
 [invisible="true"] { visibility: hidden; }
+
+/* make sure any disabled box, node, link, text, selector or whatever doesn't have any interaction */
+[disabled="true"] {
+	pointer-events: none;
+	-moz-user-focus: ignore;
+}
+
+/* trick to get colorpickers to work in in-content preferences */
+colorpicker * {
+	-moz-user-select: none;
+}
