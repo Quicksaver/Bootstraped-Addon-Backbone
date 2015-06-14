@@ -1,4 +1,4 @@
-Modules.VERSION = '2.0.0';
+Modules.VERSION = '2.0.1';
 Modules.UTILS = true;
 
 // dependsOn - object that adds a dependson attribute functionality to xul preference elements.
@@ -265,6 +265,37 @@ this.categories = {
 	init: function() {
 		document.documentElement.instantApply = true;
 		
+		// sometimes it may happen that the overlays aren't loaded in the correct order, which means the categories might not be ordered correctly,
+		// it's definitely better UX if the categories are always in the same order, so we try to ensure this
+		let categories = $('categories');
+		let node = categories.firstChild;
+		while(node) {
+			let position = node.getAttribute('position');
+			if(position) {
+				position = parseInt(position);
+				let sibling = null;
+				let previous = node.previousSibling;
+				while(previous) {
+					let related = previous.getAttribute('position');
+					if(related) {
+						related = parseInt(related);
+						if(position < related) {
+							sibling = previous;
+						} else {
+							break;
+						}
+					}
+					previous = previous.previousSibling;
+				}
+				
+				if(sibling) {
+					categories.insertBefore(node, sibling);
+				}
+			}
+			
+			node = node.nextSibling;
+		}
+		
 		Listeners.add(this.categories, "select", this);
 		Listeners.add(document.documentElement, "keydown", this);
 		Listeners.add(this.categories, "mousedown", this);
@@ -357,6 +388,8 @@ Modules.LOADMODULE = function() {
 	callOnLoad(window, function() {
 		dependsOn.updateAll();
 		Listeners.add(window, "change", dependsOn);
+		Listeners.add($('selectColor'), 'select', function(e) { console.log(e); }, true);
+		Listeners.add($('selectColor'), 'change', function(e) { console.log(e); }, true);
 		
 		initScales();
 		keys.init();
