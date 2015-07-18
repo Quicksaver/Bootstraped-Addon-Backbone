@@ -26,8 +26,6 @@ Some initial steps need to be followed to make an initial build;
 -- preferences.title - title of the add-on's preferences tab
 -- about.name - add-on's name
 -- about.signature - developer signature, either name or alias or something like it
-
-- chrome/locale/en-US/utils/about.dtd
 -- about.tryit - Catchy line for sharing the add-on in social networks
 
 4) fill changelog.json in the appropriate format, otherwise delete the file and it won't be used.
