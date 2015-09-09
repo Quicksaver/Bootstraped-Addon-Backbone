@@ -8,6 +8,9 @@
 			"date":"Month Day, Year",
 			"notes":[
 				["new/changed/bugfix/removed/updated/general/{empty}","Issue"]// , comma-separated
+				// issue can have the following markup
+				// <a=http://www.some.com/url>link</a>
+				// <b>bold text</b>
 			]
 		}// , comma-separated
 	}
