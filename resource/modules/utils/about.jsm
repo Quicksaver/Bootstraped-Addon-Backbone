@@ -1,4 +1,4 @@
-Modules.VERSION = '1.1.1';
+Modules.VERSION = '1.1.2';
 
 this.about = {
 	kNS: 'http://www.w3.org/1999/xhtml',
@@ -244,7 +244,7 @@ this.about = {
 			}
 			
 			addNode.textContent = tempTextNode.textContent.substring(matchBegin[0].length, matchEnd.index);	
-			node.replaceChild(addNode, tempTextNode);
+			tempTextNode.parentNode.replaceChild(addNode, tempTextNode);
 			
 			// process the just added node for any nested tags
 			this.parseTextMarkup(addNode.firstChild);
