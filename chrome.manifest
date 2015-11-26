@@ -1,4 +1,4 @@
-content   objPathString                    chrome/content/   contentaccessible=yes
+content   objPathString                    chrome/content/
 resource  objPathString                    resource/
 
 locale    objPathString-en   en-US         chrome/locale/en-US/
