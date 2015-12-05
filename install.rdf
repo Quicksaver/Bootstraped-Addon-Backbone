@@ -2,20 +2,20 @@
 <RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
 	<Description about="urn:mozilla:install-manifest">
 		<em:id></em:id>
-		
+
 		<em:name></em:name>
 		<em:version></em:version>
-		
+
 		<em:creator></em:creator>
 		<em:optionsURL></em:optionsURL>
 		<em:iconURL></em:iconURL>
 		<em:homepageURL></em:homepageURL>
-		
+
 		<em:type>2</em:type>
 		<em:optionsType>3</em:optionsType>
 		<em:bootstrap>true</em:bootstrap>
 		<em:multiprocessCompatible>true</em:multiprocessCompatible>
-		
+
 		<em:targetApplication>
 			<Description>
 				<em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
@@ -23,7 +23,7 @@
 				<em:maxVersion>45.0a1</em:maxVersion>
 			</Description>
 		</em:targetApplication>
-		
+
 		<em:localized>
 			<Description>
 				<em:locale>en-US</em:locale>
