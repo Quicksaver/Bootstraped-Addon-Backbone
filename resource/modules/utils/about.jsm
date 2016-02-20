@@ -1,4 +1,4 @@
-// VERSION 1.2.0
+// VERSION 1.2.1
 
 this.about = {
 	kNS: 'http://www.w3.org/1999/xhtml',
@@ -391,7 +391,7 @@ this.promo = {
 	current: '1',
 	width: 779,
 	height: 150,
-	link: 'https://www.youtube.com/watch?v=NuNlgEItQEk',
+	link: 'https://youtu.be/NuNlgEItQEk',
 
 	get container() { return $('promo-matchhead'); },
 	get tab() { return $('promo-matchhead-tab'); },
