@@ -6,7 +6,7 @@
     PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
     "DTD/xhtml1-strict.dtd">
   %htmlDTD;
-  <!ENTITY % about SYSTEM "chrome://{objPathString}/locale/utils/about.dtd" >
+  <!ENTITY % about SYSTEM "chrome://{objPathString}/locale/utils-about.dtd" >
   %about;
   <!ENTITY % addon SYSTEM "chrome://{objPathString}/locale/defaults.dtd" >
   %addon;
