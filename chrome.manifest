@@ -1,7 +1,6 @@
 content   objPathString                    chrome/content/
 resource  objPathString                    resource/
 
-locale    objPathString-en   en-US         chrome/locale/en-US/
 locale    objPathString      en-US         chrome/locale/en-US/
 
 skin      objPathString      classic/1.0   chrome/skin/common/
