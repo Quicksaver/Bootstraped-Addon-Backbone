@@ -24,6 +24,8 @@ Some initial steps need to be followed to make an initial build:
     - about.name - add-on's name
     - about.signature - developer signature, either name or alias or something like it
     - about.tryit - Catchy line for sharing the add-on in social networks
+  - chrome/locale/en-US/utils-toaster.properties
+    - replace {addonName} with the actual name
 
 4. Fill changelog.json in the appropriate format, otherwise delete the file and it won't be used.
   - Everything after and inclusive of a "//" is to be removed! It is just there to exemplify the object organization, JSON doesn't have comments in its syntax!
