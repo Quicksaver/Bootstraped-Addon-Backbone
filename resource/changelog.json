@@ -7,9 +7,11 @@
 		"#.#.#":{
 			"date":"Month Day, Year",
 			"notes":[
-				["new/changed/bugfix/removed/updated/general/{empty}","Issue"]// , comma-separated
-				// issue can have the following markup
+				["new/changed/bugfix/removed/updated/general/{empty}","Note text"]// , comma-separated
+				// notes can have the following markup
 				// <a=http://www.some.com/url>link</a>
+				// <e=addon-stub>Add-on Name</e>
+				// <i=number>
 				// <b>bold text</b>
 			]
 		}// , comma-separated
